@@ -1,8 +1,7 @@
 
 """
-This script provides the environment for a quadrotor tracking simulation.
-
-A 6-dof quadrotor is tasked with tracking a moving target quadrotor.
+This script provides the environment for a docking experiment in the SPOT
+facility at Carleton University.
 
 All dynamic environments I create will have a standardized architecture. The
 reason for this is I have one learning algorithm and many environments. All
@@ -29,15 +28,12 @@ Communication with agent:
         env_to_agent: the environment returns information to the agent
 
 Reward system:
-        - A reward is linearly decreased away from the target location.
-        - A "differential reward" system is used. The returned reward is the difference
-          between this timestep's reward and last timestep's reward. This yields
-          the effect of only positively rewarding behaviours that have a positive
-          effect on the performance.
-              Note: Otherwise, positive rewards could be given for bad actions.
-        - If the ensuing reward is negative, it is multiplied by NEGATIVE_PENALTY_FACTOR
-          so that the agent cannot fully recover from receiving negative rewards
-        - Additional penalties are awarded for colliding with the target
+        - Zero reward at all timesteps except when docking is achieved
+        - A large reward when docking occurs. The episode also terminates when docking occurs
+        - A variety of penalties to help with docking, such as:
+            - penalty for end-effector angle (so it goes into the docking cone properly)
+            - penalty for relative velocity during the docking (so the end-effector doesn't jab the docking cone)
+        - A penalty for colliding with the target
 
 State clarity:
     - self.dynamic_state contains the chaser states propagated in the dynamics
@@ -46,19 +42,16 @@ State clarity:
     - self.OBSERVATION_SIZE 
 
 
-Started April 21, 2020
+Started November 5, 2020
 @author: Kirk Hovell (khovell@gmail.com)
 """
 import numpy as np
 import os
-import psutil # FOR RAM USAGE
 import signal
 import multiprocessing
 import queue
 from scipy.integrate import odeint # Numerical integrator
 import faulthandler # Added July 11 2020 to debug "segmentation faule (core dumped)" error
-import sys
-import time
 
 import matplotlib
 matplotlib.use('Agg')
@@ -66,24 +59,6 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import matplotlib.gridspec as gridspec
-from mpl_toolkits.mplot3d import Axes3D
-
-
-
-
-# For printing out all variables and their sizes
-def sizeof_fmt(num, suffix='B'):
-    ''' by Fred Cirera,  https://stackoverflow.com/a/1094933/1870254, modified'''
-    for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
-        if abs(num) < 1024.0:
-            return "%3.1f %s%s" % (num, unit, suffix)
-        num /= 1024.0
-    return "%.1f %s%s" % (num, 'Yi', suffix)
-
-
-
-
-
 
 class Environment:
 
@@ -91,53 +66,47 @@ class Environment:
         ##################################
         ##### Environment Properties #####
         ##################################
-        self.TOTAL_STATE_SIZE         = 10 # [chaser_x, chaser_y, chaser_z, target_x, target_y, target_z, target_theta, 
-                                           #  chaser_x_dot, chaser_y_dot, chaser_z_dot]
+        self.TOTAL_STATE_SIZE         = 18 # [relative_x, relative_y, relative_vx, relative_vy, relative_angle, relative_angular_velocity, chaser_x, chaser_y, chaser_theta, target_x, target_y, target_theta, chaser_vx, chaser_vy, chaser_omega, target_vx, target_vy, target_omega] *# All expressed in the chaser's body frame #*
         ### Note: TOTAL_STATE contains all relevant information describing the problem, and all the information needed to animate the motion
         #         TOTAL_STATE is returned from the environment to the agent.
         #         A subset of the TOTAL_STATE, called the 'observation', is passed to the policy network to calculate acitons. This takes place in the agent
         #         The TOTAL_STATE is passed to the animator below to animate the motion.
         #         The chaser and target state are contained in the environment. They are packaged up before being returned to the agent.
         #         The total state information returned must be as commented beside self.TOTAL_STATE_SIZE.
-        self.IRRELEVANT_STATES                = [2,5,9] # indices of states who are irrelevant to the policy network
+        self.IRRELEVANT_STATES                = [6,7,8,9,10,11,12,13,14,15,16,17] # indices of states who are irrelevant to the policy network
         self.OBSERVATION_SIZE                 = self.TOTAL_STATE_SIZE - len(self.IRRELEVANT_STATES) # the size of the observation input to the policy
-        self.ACTION_SIZE                      = 2 # [x_dot_dot, y_dot_dot]
-        self.LOWER_ACTION_BOUND               = np.array([-2.0, -2.0]) # [rad/s, m/s^2, m/s^2, m/s^2]
-        self.UPPER_ACTION_BOUND               = np.array([ 2.0,  2.0]) # [rad/s, m/s^2, m/s^2, m/s^2]
-        self.LOWER_STATE_BOUND                = np.array([-5., -5.,  0., -5., -5.,  0., -4*2*np.pi, -4.0, -4.0, -4.0]) # [m, m, m, m, m, m, rad, m/s, m/s, m/s] // lower bound for each element of TOTAL_STATE
-        self.UPPER_STATE_BOUND                = np.array([ 5.,  5., 10.,  5.,  5., 10.,  4*2*np.pi,  4.0,  4.0,  4.0]) # [m, m, m, m, m, m, rad, m/s, m/s, m/s] // upper bound for each element of TOTAL_STATE
+        self.ACTION_SIZE                      = 3 # [x_dot_dot, y_dot_dot, theta_dot_dot]
+        self.LOWER_ACTION_BOUND               = np.array([-0.025, -0.025, -0.001]) # [m/s^2, m/s^2, rad/s^2]
+        self.UPPER_ACTION_BOUND               = np.array([ 0.025,  0.025,  0.001]) # [m/s^2, m/s^2, rad/s^2]
+        self.LOWER_STATE_BOUND                = np.array([-3., -3., -0.5, -0.5, -2*np.pi, -np.pi/6, -3., -3., -2*np.pi, -3., -3., -2*np.pi, -0.5, -0.5, -np.pi/6, -0.5, -0.5, -np.pi/6]) # [m, m, m/s, m/s, rad, rad/s, m, m, rad, m, m, rad, m/s, m/s, rad/s, m/s, m/s, rad/s] // lower bound for each element of TOTAL_STATE
+        self.UPPER_STATE_BOUND                = np.array([ 3.,  3.,  0.5,  0.5,  2*np.pi,  np.pi/6,  3.,  3.,  2*np.pi,  3.,  3.,  2*np.pi,  0.5,  0.5,  np.pi/6,  0.5,  0.5,  np.pi/6]) # [m, m, m,s, m,s, rad, rad/s, m, m, rad, m, m, rad, m/s, m/s, rad/s, m/s, m/s, rad/s] // upper bound for each element of TOTAL_STATE
         self.NORMALIZE_STATE                  = True # Normalize state on each timestep to avoid vanishing gradients
         self.RANDOMIZE                        = True # whether or not to RANDOMIZE the state & target location
-        self.INITIAL_CHASER_POSITION          = np.array([0.0, 2.0, 0.0]) # [m, m, m]
-        self.INITIAL_CHASER_VELOCITY          = np.array([0.0, 0.0, 0.0]) # [m/s, m/s, m/s]
-        self.INITIAL_TARGET_POSITION          = np.array([0.0, 0.0, 5.0, 0.0]) # [m, m, m, rad]
-        self.MIN_V                            = -200.
-        self.MAX_V                            =  300.
-        self.N_STEP_RETURN                    =   1 ####*********%%%%%% SET TO 1 -> Used to be set to 5 ^^$%*$%*#$$&@&#*$*
+        
+        
+        # Am I tracking things in the inertial frame but calculating policy inputs in the chaser frame?
+        
+        
+        
+        self.INITIAL_CHASER_POSITION          = np.array([3.0, 1.2, 0.0]) # [m, m, rad]
+        self.INITIAL_CHASER_VELOCITY          = np.array([0.0, 0.0, 0.0]) # [m/s, m/s, rad/s]
+        self.INITIAL_TARGET_POSITION          = np.array([2.0, 1.0, 0.0]) # [m, m, rad]
+        self.INITIAL_TARGET_VELOCITY          = np.array([0.0, 0.0, 0.0]) # [m/s, m/s, rad/s]
+        self.MIN_V                            = -100.
+        self.MAX_V                            =  100.
+        self.N_STEP_RETURN                    =   5
         self.DISCOUNT_FACTOR                  =   0.95**(1/self.N_STEP_RETURN)
         self.TIMESTEP                         =   0.2 # [s]
-        self.DYNAMICS_DELAY                   =   3 # [timesteps of delay] how many timesteps between when an action is commanded and when it is realized
-        self.AUGMENT_STATE_WITH_ACTION_LENGTH =   3 # [timesteps] how many timesteps of previous actions should be included in the state. This helps with making good decisions among delayed dynamics.
-        self.TARGET_REWARD                    =   1. # reward per second
-        self.FALL_OFF_TABLE_PENALTY           =   0.
+        self.DYNAMICS_DELAY                   =   0 # [timesteps of delay] how many timesteps between when an action is commanded and when it is realized
+        self.AUGMENT_STATE_WITH_ACTION_LENGTH =   0 # [timesteps] how many timesteps of previous actions should be included in the state. This helps with making good decisions among delayed dynamics.
+        self.FALL_OFF_TABLE_PENALTY           =  100.
         self.END_ON_FALL                      = False # end episode on a fall off the table
         self.GOAL_REWARD                      =   0.
         self.NEGATIVE_PENALTY_FACTOR          = 1.5 # How much of a factor to additionally penalize negative rewards
-        self.MAX_NUMBER_OF_TIMESTEPS          = 100 # per episode
+        self.MAX_NUMBER_OF_TIMESTEPS          = 200 # per episode
         self.ADDITIONAL_VALUE_INFO            = False # whether or not to include additional reward and value distribution information on the animations
-        self.REWARD_TYPE                      = True # True = Linear; False = Exponential
-        self.REWARD_WEIGHTING                 = [0.5, 0.5, 0.] # How much to weight the rewards in the state
-        self.REWARD_MULTIPLIER                = 250 # how much to multiply the differential reward by
-        self.TOP_DOWN_VIEW                    = True # Animation property
         self.SKIP_FAILED_ANIMATIONS           = True # Error the program or skip when animations fail?
-        
-        # Obstacle properties
-        self.USE_OBSTACLE              = False # Also change self.IRRELEVANT_STATES
-        self.OBSTABLE_PENALTY          = 15 # [rewards/second] How bad is it to collide with the obstacle?
-        self.OBSTABLE_DISTANCE         = 0.2 # [m] radius of which the obstacle penalty will be applied
-        self.OBSTACLE_INITIAL_POSITION = np.array([1.2, 1.2, 1.2]) # [m]
-        self.OBSTABLE_VELOCITY         = np.array([0.0, 0.0, 0.0]) # [m/s]
-		
+
         # Test time properties
         self.TEST_ON_DYNAMICS            = True # Whether or not to use full dynamics along with a PD controller at test time
         self.KINEMATIC_NOISE             = False # Whether or not to apply noise to the kinematics in order to simulate a poor controller
@@ -146,8 +115,11 @@ class Environment:
         self.FORCE_NOISE_AT_TEST_TIME    = False # [Default -> False] Whether or not to force kinematic noise to be present at test time
 
         # PD Controller Gains
-        self.KP                       = 0.5 # Proportional-velocity controller gain for attitude controller
         self.KI                       = 0.5 # Integral gain for the integral-linear acceleration controller
+        
+        Start Here
+        
+        
         
         # Physical properties
         self.LENGTH  = 0.3  # [m] side length
@@ -495,31 +467,12 @@ class Environment:
                 if self.DYNAMICS_DELAY > 0:
                     self.action_delay_queue.put(action,False) # puts the current action to the bottom of the stack
                     action = self.action_delay_queue.get(False) # grabs the delayed action and treats it as truth.                
-                
-                
-#                time.sleep(0.1)
-#                for name, size in sorted(((name, sys.getsizeof(value)) for name, value in locals().items()),
-#                                     key= lambda x: -x[1])[:10]:
-#                    print("{:>30}: {:>8}".format(name, sizeof_fmt(size)))
-                
-                
+
                 ################################
                 ##### Step the environment #####
                 ################################                
                 reward, done = self.step(action)
-                
-                
-                
-                
-                
-                #print(sys.getsizeof(self.action_delay_queue), sys.getsizeof(self.target_location), sys.getsizeof(action))
-                
-                
-                
-                
-                
-                
-                
+
                 if (self.counter % 1000) == 0:
                     pass
                     #print("Environment.py PID %i is using %2.3f GB of RAM" %(os.getpid(), self.process.memory_info().rss/1000000000.0))

@@ -51,7 +51,6 @@ import signal
 import multiprocessing
 import queue
 from scipy.integrate import odeint # Numerical integrator
-import faulthandler # Added July 11 2020 to debug "segmentation faule (core dumped)" error
 
 import matplotlib
 matplotlib.use('Agg')
@@ -66,7 +65,7 @@ class Environment:
         ##################################
         ##### Environment Properties #####
         ##################################
-        self.TOTAL_STATE_SIZE         = 18 # [relative_x, relative_y, relative_vx, relative_vy, relative_angle, relative_angular_velocity, chaser_x, chaser_y, chaser_theta, target_x, target_y, target_theta, chaser_vx, chaser_vy, chaser_omega, target_vx, target_vy, target_omega] *# All expressed in the chaser's body frame #*
+        self.TOTAL_STATE_SIZE         = 18 # [relative_x, relative_y, relative_vx, relative_vy, relative_angle, relative_angular_velocity, chaser_x, chaser_y, chaser_theta, target_x, target_y, target_theta, chaser_vx, chaser_vy, chaser_omega, target_vx, target_vy, target_omega] *# Relative pose expressed in the chaser's body frame; everythign else in Inertial frame #*
         ### Note: TOTAL_STATE contains all relevant information describing the problem, and all the information needed to animate the motion
         #         TOTAL_STATE is returned from the environment to the agent.
         #         A subset of the TOTAL_STATE, called the 'observation', is passed to the policy network to calculate acitons. This takes place in the agent
@@ -103,13 +102,14 @@ class Environment:
         self.SKIP_FAILED_ANIMATIONS           = True # Error the program or skip when animations fail?
 
         # Reward function properties
-        self.DOCKING_REWARD            = 100 # A lump-sum given to the chaser when it docks
-        self.DOCKING_ANGLE_PENALTY     = 1 # A penalty given to the chaser, upon docking, for having an angle when docking
-        self.DOCKING_VELOCITY_PENALTY  = 1 # A penalty given to the chaser, upon docking, for having residual velocity and therefore bumping the target
-        self.TARGET_COLLISION_PENALTY  = 15           # [rewards/second] penalty given for colliding with target  
-        self.TARGET_COLLISION_DISTANCE = np.sqrt(2)*self.LENGTH # [m] how close chaser and target need to be before a penalty is applied
-        self.END_ON_FALL               = False # end episode on a fall off the table        
-        self.FALL_OFF_TABLE_PENALTY    =  100.
+        self.DOCKING_REWARD              = 100 # A lump-sum given to the chaser when it docks
+        self.SUCCESSFUL_DOCKING_DISTANCE = 0.01 # [m] distance at which the magnetic docking can occur
+        self.DOCKING_ANGLE_PENALTY       = 1 # A penalty given to the chaser, upon docking, for having an angle when docking
+        self.DOCKING_VELOCITY_PENALTY    = 1 # A penalty given to the chaser, upon docking, for having residual velocity and therefore bumping the target
+        self.TARGET_COLLISION_PENALTY    = 15           # [rewards/second] penalty given for colliding with target  
+        self.TARGET_COLLISION_DISTANCE   = np.sqrt(2)*self.LENGTH # [m] how close chaser and target need to be before a penalty is applied
+        self.END_ON_FALL                 = False # end episode on a fall off the table        
+        self.FALL_OFF_TABLE_PENALTY      = 100.
 
         # Physical properties
         self.LENGTH                = 0.3  # [m] side length
@@ -124,7 +124,7 @@ class Environment:
         self.KINEMATIC_POSITION_NOISE_SD = [0.2, 0.2, 0.2] # The standard deviation of the noise that is to be applied to each position element in the state
         self.KINEMATIC_VELOCITY_NOISE_SD = [0.1, 0.1, 0.1] # The standard deviation of the noise that is to be applied to each velocity element in the state
         self.FORCE_NOISE_AT_TEST_TIME    = False # [Default -> False] Whether or not to force kinematic noise to be present at test time
-        self.KI                          = 0.5 # Integral gain for the integral-linear acceleration controller
+        self.KI                          = [10, 10, 0.5] # Integral gain for the integral-linear acceleration controller in [X, Y, and angle]
         
 
         # Some calculations that don't need to be changed
@@ -174,14 +174,9 @@ class Environment:
         # Resetting the chaser's initial velocity
         self.chaser_velocity = self.INITIAL_CHASER_VELOCITY
         
-        # End effector position in the Inertial frame
-        #TODO: calculate end-effector position
-        self.end_effector_position = self.chaser_location
-        
-        # Docking port location in Inertial frame
-        #TODO: calculate docking port location
-        self.docking_port = self.target_location[:-1] + np.array([np.cos(self.target_location[3])*0.5, np.sin(self.target_location[3])*0.5, 0.])
-            
+        # Update docking component locations
+        self.update_docking_locations()
+
         # Initializing the previous velocity and control effort for the integral-acceleration controller
         self.previous_velocity = np.zeros(len(self.INITIAL_CHASER_VELOCITY))
         self.previous_control_effort = np.zeros(len(self.ACTION_SIZE))
@@ -198,6 +193,11 @@ class Environment:
             for i in range(self.DYNAMICS_DELAY):
                 self.action_delay_queue.put(np.zeros(self.ACTION_SIZE + 1), False)
 
+    def update_docking_locations(self):
+        # Updates the position of the end-effector and the docking port in the Inertial frame
+        #TODO: finish this
+        self.end_effector_position = 0
+        self.docking_port_position = 0
     #####################################
     ##### Step the Dynamics forward #####
     #####################################
@@ -249,17 +249,13 @@ class Environment:
             # Ensuring the velocity is within the bounds
             self.chaser_velocity = np.clip(self.chaser_velocity, -self.VELOCITY_LIMIT, self.VELOCITY_LIMIT)
 
-start here
-        # Step target's attitude ahead one timestep
-        self.target_location[3] += self.TARGET_ANGULAR_VELOCITY*self.TIMESTEP
 
-        # Update the docking port target state
-        self.docking_port = self.target_location[:-1] + np.array([np.cos(self.target_location[3])*0.5, np.sin(self.target_location[3])*0.5, 0.])
+        # Step target's state ahead one timestep
+        self.target_location += self.INITIAL_TARGET_VELOCITY * self.TIMESTEP
 
-        # Update the hold point location
-        self.hold_point   = self.target_location[:-1] + np.array([np.cos(self.target_location[3])*self.HOLD_POINT_DISTANCE, np.sin(self.target_location[3])*self.HOLD_POINT_DISTANCE, 0.])
-
-
+        # Update docking locations
+        self.update_docking_locations()
+        
         # Increment the timestep
         self.time += self.TIMESTEP
 
@@ -272,109 +268,71 @@ start here
         # Return the (reward, done)
         return reward, done
 
+
     def controller(self, action):
         # This function calculates the control effort based on the state and the
         # desired acceleration (action)
         
-        ###########################################################
-        ### Position control (integral-acceleration controller) ###
-        ###########################################################
-        desired_linear_acceleration = action
+        ########################################
+        ### Integral-acceleration controller ###
+        ########################################
+        desired_accelerations = action
         
-        current_velocity = self.chaser_velocity # [v_x, v_y, v_z]
-        current_linear_acceleration = (current_velocity - self.previous_velocity)/self.TIMESTEP # Approximating the current acceleration [a_x, a_y, a_z]
+        current_velocity = self.chaser_velocity # [v_x, v_y, omega]
+        current_accelerations = (current_velocity - self.previous_velocity)/self.TIMESTEP # Approximating the current acceleration [a_x, a_y, alpha]
         
         # Checking whether our velocity is too large AND the acceleration is trying to increase said velocity... in which case we set the desired_linear_acceleration to zero.
-        desired_linear_acceleration[(np.abs(current_velocity) > self.VELOCITY_LIMIT) & (np.sign(desired_linear_acceleration) == np.sign(current_velocity))] = 0        
+        desired_accelerations[(np.abs(current_velocity) > self.VELOCITY_LIMIT) & (np.sign(desired_accelerations) == np.sign(current_velocity))] = 0        
         
         # Calculating acceleration error
-        linear_acceleration_error = desired_linear_acceleration - current_linear_acceleration
+        acceleration_error = desired_accelerations - current_accelerations
         
         # Integral-acceleration control
-        linear_control_effort = self.previous_linear_control_effort + self.KI * linear_acceleration_error
+        control_effort = self.previous_control_effort + self.KI * acceleration_error
 
         # Saving the current velocity for the next timetsep
         self.previous_velocity = current_velocity
         
         # Saving the current control effort for the next timestep
-        self.previous_linear_control_effort = linear_control_effort
+        self.previous_control_effort = control_effort
 
-        return linear_control_effort
-
-    def pose_error(self):
-        """
-        This method returns the pose error of the current state.
-        Instead of returning [state, desired_state] as the state, I'll return
-        [state, error]. The error will be more helpful to the policy I believe.
-        """
-        if self.phase_number == 0:
-            return self.hold_point - self.chaser_position
-        elif self.phase_number == 1:
-            return self.docking_port - self.chaser_position
+        # [F_x, F_y, torque]
+        return control_effort
 
 
     def reward_function(self, action):
         # Returns the reward for this TIMESTEP as a function of the state and action
-
-        # Sets the current location that we are trying to move to
-        desired_location = self.hold_point
-
-        current_position_reward = np.zeros(1)
-
-        # Calculates a reward map
-        if self.REWARD_TYPE:
-            # Linear reward
-            current_position_reward = -np.abs((desired_location - self.chaser_position)*self.REWARD_WEIGHTING)* self.TARGET_REWARD
-        else:
-            # Exponential reward
-            current_position_reward = np.exp(-np.sum(np.absolute(desired_location - self.chaser_position)*self.REWARD_WEIGHTING)) * self.TARGET_REWARD
-
-        reward = np.zeros(1)
-
-        # If it's not the first timestep, calculate the differential reward
-        if np.all([self.previous_position_reward[i] is not None for i in range(len(self.previous_position_reward))]):
-            reward = (current_position_reward - self.previous_position_reward)*self.REWARD_MULTIPLIER
-            for i in range(len(reward)):
-                if reward[i] < 0:
-                    reward[i]*= self.NEGATIVE_PENALTY_FACTOR
-
-        self.previous_position_reward = current_position_reward
-
-        # Collapsing to a scalar
-        reward = np.sum(reward)
-
-        # Giving a massive penalty for falling off the table
-        if self.chaser_position[0] > self.UPPER_STATE_BOUND[0] or self.chaser_position[0] < self.LOWER_STATE_BOUND[0] or self.chaser_position[1] > self.UPPER_STATE_BOUND[1] or self.chaser_position[1] < self.LOWER_STATE_BOUND[1]:
-            reward -= self.FALL_OFF_TABLE_PENALTY/self.TIMESTEP
-
-        # Giving a large reward for completing the task
-        if np.sum(np.absolute(self.chaser_position - desired_location)) < 0.01:
-            reward += self.GOAL_REWARD
+        
+        """
+        Reward system:
+                - Zero reward at all timesteps except when docking is achieved
+                - A large reward when docking occurs. The episode also terminates when docking occurs
+                - A variety of penalties to help with docking, such as:
+                    - penalty for end-effector angle (so it goes into the docking cone properly)
+                    - penalty for relative velocity during the docking (so the end-effector doesn't jab the docking cone)
+                - A penalty for colliding with the target
+         """ 
+                
+        # Initializing the reward
+        reward = 0
+        
+        # Give a large reward for docking
+        if np.linalg.norm(self.end_effector_position - self.docking_port_position) <= self.SUCCESSFUL_DOCKING_DISTANCE:
+            reward += self.DOCKING_REWARD
             
-        # Giving a large penalty for colliding with the obstacle
-        if np.linalg.norm(self.chaser_position - self.obstacle_location) <= self.OBSTABLE_DISTANCE and self.USE_OBSTACLE:
-            reward -= self.OBSTABLE_PENALTY
+            # Penalize for end-effector angle
+            #TODO: docking penalties
             
+            # Penalize for relative velocity during docking
+            #TODO: docking penalties
+        
         # Giving a penalty for colliding with the target
-        if np.linalg.norm(self.chaser_position[:-1] - self.target_location[:-2]) <= self.TARGET_COLLISION_DISTANCE:
+        if np.linalg.norm(self.chaser_position[:-1] - self.target_location[:-1]) <= self.TARGET_COLLISION_DISTANCE:
             reward -= self.TARGET_COLLISION_PENALTY
-            
-        # Giving a penalty for high velocities near the target location
-        if self.PENALIZE_VELOCITY:
-            radius = np.linalg.norm(desired_location- self.target_location[:2]) # vector from the target to the desired location
-            reference_velocity = self.TARGET_ANGULAR_VELOCITY*np.array([-radius*np.sin(self.target_location[2]), radius*np.cos(self.target_location[2]), 0, 1])
-            reward -= np.sum(np.abs(action - reference_velocity)/(self.pose_error()**2+0.01)*self.VELOCITY_PENALTY)
-        
-        # Giving a penalty for exceeding the recommended maximum velocity (decided by Murat)
-        if self.PENALIZE_MAX_VELOCITY:
-            reward -= self.MAX_VELOCITY_PENALTY*np.sum(np.abs(self.chaser_velocity) > self.VELOCITY_LIMIT)
-            
-        
-        # Penalizing acceleration commands (to encourage fuel efficiency)
-        reward -= np.sum(self.ACCELERATION_PENALTY*np.abs(action))
 
         # Multiplying the reward by the TIMESTEP to give the rewards on a per-second basis
         return (reward*self.TIMESTEP).squeeze()
+
 
     def is_done(self):
         # Checks if this episode is done or not
@@ -382,12 +340,15 @@ start here
             NOTE: THE ENVIRONMENT MUST RETURN done = True IF THE EPISODE HAS
                   REACHED ITS LAST TIMESTEP
         """
+        done = False
+        
+        # If we've docked with the target
+        if np.linalg.norm(self.end_effector_position - self.docking_port_position) <= self.SUCCESSFUL_DOCKING_DISTANCE:
+            done = True
 
         # If we've fallen off the table, end the episode
         if self.chaser_position[0] > self.UPPER_STATE_BOUND[0] or self.chaser_position[0] < self.LOWER_STATE_BOUND[0] or self.chaser_position[1] > self.UPPER_STATE_BOUND[1] or self.chaser_position[1] < self.LOWER_STATE_BOUND[1] or self.chaser_position[2] > self.UPPER_STATE_BOUND[2] or self.chaser_position[2] < self.LOWER_STATE_BOUND[2]:
             done = self.END_ON_FALL
-        else:
-            done = False
 
         # If we've run out of timesteps
         if round(self.time/self.TIMESTEP) == self.MAX_NUMBER_OF_TIMESTEPS:
@@ -403,11 +364,32 @@ start here
 
         return self.agent_to_env, self.env_to_agent
     
-    def obstable_relative_location(self):
-        # Returns the position of the obstacle with respect to the chaser
-        relative_position = self.obstacle_location - self.chaser_position[:len(self.chaser_position)-1]
+    def relative_pose_body_frame(self):
+        # Calculate the relative_x, relative_y, relative_vx, relative_vy, relative_angle, relative_angular_velocity
+        # All in the body frame
+                
+        chaser_angle = self.chaser_location[-1]        
+        # Rotation matrix (inertial -> body)
+        C_bI = np.array([[ np.cos(chaser_angle), np.sin(chaser_angle)],
+                         [-np.sin(chaser_angle), np.cos(chaser_angle)]]) # [2, 2]
+                
+        # [X,Y] relative position in inertial frame
+        relative_position_inertial = self.target_location[:-1] - self.chaser_location[:-1]    
+        relative_position_body = np.matmul(C_bI, relative_position_inertial)
         
-        return relative_position
+        # [X, Y] Relative velocity in inertial frame
+        relative_velocity_inertial = self.target_velocity[:-1] - self.chaser_velocity[:-1]
+        relative_velocity_body = np.matmul(C_bI, relative_velocity_inertial)
+        
+        # Relative angle
+        relative_angle = self.target_location[-1] - self.chaser_location[-1]
+        
+        # Relative angular velocity
+        relative_angular_velocity = self.target_velocity[-1] - self.chaser_velocity[-1]
+        
+        start here testing this
+        
+        return np.concatenate([relative_position_body, relative_velocity_body, relative_angle, relative_angular_velocity])
 
     def run(self):
         ###################################
@@ -418,13 +400,14 @@ start here
         It is responsible for continually listening for an input action from the
         agent through a Queue. If an action is received, it is to step the environment
         and return the results.
+        
+        TOTAL_STATE_SIZE = 18 [relative_x, relative_y, relative_vx, relative_vy, relative_angle, relative_angular_velocity, 
+                               chaser_x, chaser_y, chaser_theta, target_x, target_y, target_theta, 
+                               chaser_vx, chaser_vy, chaser_omega, target_vx, target_vy, target_omega] *# Relative pose expressed in the chaser's body frame; everythign else in Inertial frame #*        
         """
         # Instructing this process to treat Ctrl+C events (called SIGINT) by going SIG_IGN (ignore).
         # This permits the process to continue upon a Ctrl+C event to allow for graceful quitting.
         signal.signal(signal.SIGINT, signal.SIG_IGN)
-
-        
-        self.counter = 0 # INITIALIZING
         
         # Loop until the process is terminated
         while True:
@@ -436,8 +419,7 @@ start here
                 self.reset(action, test_time[0])
                 
                 # Return the TOTAL_STATE
-                total_state = np.concatenate([self.chaser_position, np.concatenate([self.target_location, self.chaser_velocity]) ])
-                self.env_to_agent.put(total_state)
+                self.env_to_agent.put(np.concatenate([self.relative_pose_body_frame(self), self.chaser_location, self.target_location, self.chaser_velocity, self.target_velocity]))
 
             else:
                 # Delay the action by DYNAMICS_DELAY timesteps. The environment accumulates the action delay--the agent still thinks the sent action was used.
@@ -450,13 +432,8 @@ start here
                 ################################                
                 reward, done = self.step(action)
 
-                if (self.counter % 1000) == 0:
-                    pass
-                    #print("Environment.py PID %i is using %2.3f GB of RAM" %(os.getpid(), self.process.memory_info().rss/1000000000.0))
-                self.counter += 1
-
-                # Return (TOTAL_STATE, reward, done, guidance_position)
-                self.env_to_agent.put((np.concatenate([self.chaser_position, np.concatenate([self.target_location, self.chaser_velocity]) ]), reward, done))
+                # Return (TOTAL_STATE, reward, done)
+                self.env_to_agent.put((np.concatenate([self.relative_pose_body_frame(self), self.chaser_location, self.target_location, self.chaser_velocity, self.target_velocity]), reward, done))
 
 ###################################################################
 ##### Generating kinematics equations representing the motion #####
@@ -502,8 +479,6 @@ def dynamics_equations_of_motion(state, t, parameters):
 ##### Function to animate the motion #####
 ##########################################
 def render(states, actions, instantaneous_reward_log, cumulative_reward_log, critic_distributions, target_critic_distributions, projected_target_distribution, bins, loss_log, guidance_position_log, episode_number, filename, save_directory):
-
-    faulthandler.enable() # to get more information about segmentation fault (core dumped) error 
     
     # Load in a temporary environment, used to grab the physical parameters
     temp_env = Environment()

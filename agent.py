@@ -228,11 +228,6 @@ class Agent:
                 ##### Running the Policy #####
                 ##############################
                 action = self.sess.run(self.policy.action_scaled, feed_dict = {self.state_placeholder: np.expand_dims(observation,0)})[0] # Expanding the observation to be a 1x3 instead of a 3
-                
-#                time.sleep(0.1)
-#                for name, size in sorted(((name, sys.getsizeof(value)) for name, value in globals().items()),
-#                                     key= lambda x: -x[1])[:10]:
-#                    print("{:>30}: {:>8}".format(name, sizeof_fmt(size)))
 
                 # Calculating random action to be added to the noise chosen from the policy to force exploration.
                 if Settings.UNIFORM_OR_GAUSSIAN_NOISE:
@@ -253,7 +248,7 @@ class Agent:
                 #### Step the dynamics forward one timestep ####
                 ################################################
                 # Send the action to the environment process
-                self.agent_to_env.put((np.concatenate([action, np.zeros([1])]),))
+                self.agent_to_env.put((action,))
 
                 # Receive results from stepped environment
                 next_total_state, reward, done = self.env_to_agent.get() # The * means the variable will be unpacked only if it exists

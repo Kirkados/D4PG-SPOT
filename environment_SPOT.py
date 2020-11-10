@@ -75,17 +75,18 @@ class Environment:
         self.IRRELEVANT_STATES                = [6,7,8,9,10,11,12,13,14,15,16,17] # indices of states who are irrelevant to the policy network
         self.OBSERVATION_SIZE                 = self.TOTAL_STATE_SIZE - len(self.IRRELEVANT_STATES) # the size of the observation input to the policy
         self.ACTION_SIZE                      = 3 # [x_dot_dot, y_dot_dot, theta_dot_dot] in the BODY frame
-        self.VELOCITY_LIMIT                   = 0.5 # [m/s] maximum allowable velocity, a hard cap is enforced if this velocity is exceeded
-        self.LOWER_ACTION_BOUND               = np.array([-0.025, -0.025, -0.001]) # [m/s^2, m/s^2, rad/s^2]
-        self.UPPER_ACTION_BOUND               = np.array([ 0.025,  0.025,  0.001]) # [m/s^2, m/s^2, rad/s^2]
-        self.LOWER_STATE_BOUND                = np.array([-3., -3., -self.VELOCITY_LIMIT, -self.VELOCITY_LIMIT, -2*np.pi, -np.pi/6, -3., -3., -2*np.pi, -3., -3., -2*np.pi, -self.VELOCITY_LIMIT, -self.VELOCITY_LIMIT, -np.pi/6, -self.VELOCITY_LIMIT, -self.VELOCITY_LIMIT, -np.pi/6]) # [m, m, m/s, m/s, rad, rad/s, m, m, rad, m, m, rad, m/s, m/s, rad/s, m/s, m/s, rad/s] // lower bound for each element of TOTAL_STATE
-        self.UPPER_STATE_BOUND                = np.array([ 3.,  3.,  self.VELOCITY_LIMIT,  self.VELOCITY_LIMIT,  2*np.pi,  np.pi/6,  3.,  3.,  2*np.pi,  3.,  3.,  2*np.pi,  self.VELOCITY_LIMIT,  self.VELOCITY_LIMIT,  np.pi/6,  self.VELOCITY_LIMIT,  self.VELOCITY_LIMIT,  np.pi/6]) # [m, m, m,s, m,s, rad, rad/s, m, m, rad, m, m, rad, m/s, m/s, rad/s, m/s, m/s, rad/s] // upper bound for each element of TOTAL_STATE
-        self.INITIAL_CHASER_POSITION          = np.array([3.0, 1.2, 0.0]) # [m, m, rad]
-        self.INITIAL_CHASER_VELOCITY          = np.array([1.0, 0.0, 0.0]) # [m/s, m/s, rad/s]
+        self.MAX_VELOCITY                     = 0.5 # [m/s]
+        self.MAX_ANGULAR_VELOCITY             = np.pi/6 # [rad/s]
+        self.LOWER_ACTION_BOUND               = np.array([-0.025, -0.025, -0.1]) # [m/s^2, m/s^2, rad/s^2]
+        self.UPPER_ACTION_BOUND               = np.array([ 0.025,  0.025,  0.1]) # [m/s^2, m/s^2, rad/s^2]
+        self.LOWER_STATE_BOUND                = np.array([-3., -3., -self.MAX_VELOCITY, -self.MAX_VELOCITY, -2*np.pi, -self.MAX_ANGULAR_VELOCITY, -3., -3., -2*np.pi, -3., -3., -2*np.pi, -self.MAX_VELOCITY, -self.MAX_VELOCITY, -self.MAX_ANGULAR_VELOCITY, -self.MAX_VELOCITY, -self.MAX_VELOCITY, -self.MAX_ANGULAR_VELOCITY]) # [m, m, m/s, m/s, rad, rad/s, m, m, rad, m, m, rad, m/s, m/s, rad/s, m/s, m/s, rad/s] // lower bound for each element of TOTAL_STATE
+        self.UPPER_STATE_BOUND                = np.array([ 3.,  3.,  self.MAX_VELOCITY,  self.MAX_VELOCITY,  2*np.pi,  self.MAX_ANGULAR_VELOCITY,  3.,  3.,  2*np.pi,  3.,  3.,  2*np.pi,  self.MAX_VELOCITY,  self.MAX_VELOCITY,  self.MAX_ANGULAR_VELOCITY,  self.MAX_VELOCITY,  self.MAX_VELOCITY,  self.MAX_ANGULAR_VELOCITY]) # [m, m, m,s, m,s, rad, rad/s, m, m, rad, m, m, rad, m/s, m/s, rad/s, m/s, m/s, rad/s] // upper bound for each element of TOTAL_STATE
+        self.INITIAL_CHASER_POSITION          = np.array([1.0, 1.2, 0.0]) # [m, m, rad]
+        self.INITIAL_CHASER_VELOCITY          = np.array([0.0, 0.0, 0.0]) # [m/s, m/s, rad/s]
         self.INITIAL_TARGET_POSITION          = np.array([2.0, 1.0, 0.0]) # [m, m, rad]
         self.INITIAL_TARGET_VELOCITY          = np.array([0.0, 0.0, 0.0]) # [m/s, m/s, rad/s]
         self.NORMALIZE_STATE                  = True # Normalize state on each timestep to avoid vanishing gradients
-        self.RANDOMIZE                        = False # whether or not to RANDOMIZE the state & target location
+        self.RANDOMIZE                        = True # whether or not to RANDOMIZE the state & target location
         self.RANDOMIZATION_LENGTH             = 1 # [m] standard deviation of position randomization
         self.RANDOMIZATION_ANGLE              = np.pi/2 # [rad] standard deviation of angular randomization
         self.RANDOMIZATION_TARGET_VELOCITY    = 0.0 # [m/s] standard deviation of the target's velocity randomization
@@ -97,7 +98,7 @@ class Environment:
         self.TIMESTEP                         =   0.2 # [s]
         self.DYNAMICS_DELAY                   =   0 # [timesteps of delay] how many timesteps between when an action is commanded and when it is realized
         self.AUGMENT_STATE_WITH_ACTION_LENGTH =   0 # [timesteps] how many timesteps of previous actions should be included in the state. This helps with making good decisions among delayed dynamics.
-        self.MAX_NUMBER_OF_TIMESTEPS          = 200 # per episode
+        self.MAX_NUMBER_OF_TIMESTEPS          = 150 # per episode
         self.ADDITIONAL_VALUE_INFO            = False # whether or not to include additional reward and value distribution information on the animations
         self.SKIP_FAILED_ANIMATIONS           = True # Error the program or skip when animations fail?
 
@@ -105,11 +106,11 @@ class Environment:
         self.LENGTH                = 0.3  # [m] side length
         self.MASS                  = 10.0   # [kg] for chaser
         self.INERTIA               = 1/12*self.MASS*(self.LENGTH**2 + self.LENGTH**2) # 0.15 [kg m^2]
-        self.DOCKING_PORT_POSITION = [-self.LENGTH/2, 0] # position of the docking cone on the target in its body frame
-        self.ARM_MOUNT_POSITION    = [0, self.LENGTH/2] # [m] position of the arm mounting point on the chaser in the body frame
+        self.DOCKING_PORT_POSITION = np.array([0, self.LENGTH/2]) # position of the docking cone on the target in its body frame
+        self.ARM_MOUNT_POSITION    = np.array([0, self.LENGTH/2]) # [m] position of the arm mounting point on the chaser in the body frame
         self.SHOULDER_POSITION     = self.ARM_MOUNT_POSITION + [0, 0.05] # [m] position of the arm's shoulder in the chaser body frame
-        self.ELBOW_POSITION        = self.SHOULDER_POSITION + [0, 0.3] # [m] position of the arm's elbow in the chaser body frame
-        self.WRIST_POSITION        = self.ELBOW_POSITION + [0.3*np.cos(np.pi/4),0.3*np.sin(np.pi/4)] # [m] position of the arm's wrist in the chaser body frame
+        self.ELBOW_POSITION        = self.SHOULDER_POSITION + [0.3*np.sin(np.pi/6), 0.3*np.cos(np.pi/6)] # [m] position of the arm's elbow in the chaser body frame
+        self.WRIST_POSITION        = self.ELBOW_POSITION + [0.3*np.sin(np.pi/4),-0.3*np.cos(np.pi/4)] # [m] position of the arm's wrist in the chaser body frame
         self.END_EFFECTOR_POSITION = self.WRIST_POSITION + [0.1, 0] # po sition of the optimally-deployed end-effector on the chaser in the body frame
         
         # Reward function properties
@@ -128,17 +129,14 @@ class Environment:
         self.KINEMATIC_POSITION_NOISE_SD = [0.2, 0.2, 0.2] # The standard deviation of the noise that is to be applied to each position element in the state
         self.KINEMATIC_VELOCITY_NOISE_SD = [0.1, 0.1, 0.1] # The standard deviation of the noise that is to be applied to each velocity element in the state
         self.FORCE_NOISE_AT_TEST_TIME    = False # [Default -> False] Whether or not to force kinematic noise to be present at test time
-        self.KI                          = [10, 10, 0.5] # Integral gain for the integral-linear acceleration controller in [X, Y, and angle]
+        self.KI                          = [10, 10, 0.05] # Integral gain for the integral-linear acceleration controller in [X, Y, and angle] (how fast does the commanded acceleration get realized)
         
-
+        
         # Some calculations that don't need to be changed
+        self.VELOCITY_LIMIT           = np.array([self.MAX_VELOCITY, self.MAX_VELOCITY, self.MAX_ANGULAR_VELOCITY]) # [m/s, m/s, rad/s] maximum allowable velocity/angular velocity; a hard cap is enforced if this velocity is exceeded in kinematics & the controller enforces the limit in dynamics & experiment
         self.LOWER_STATE_BOUND        = np.concatenate([self.LOWER_STATE_BOUND, np.tile(self.LOWER_ACTION_BOUND, self.AUGMENT_STATE_WITH_ACTION_LENGTH)]) # lower bound for each element of TOTAL_STATE
         self.UPPER_STATE_BOUND        = np.concatenate([self.UPPER_STATE_BOUND, np.tile(self.UPPER_ACTION_BOUND, self.AUGMENT_STATE_WITH_ACTION_LENGTH)]) # upper bound for each element of TOTAL_STATE        
         self.OBSERVATION_SIZE         = self.TOTAL_STATE_SIZE - len(self.IRRELEVANT_STATES) # the size of the observation input to the policy
-        
-        
-        self.reset(False,False)
-        print(self.relative_pose_body_frame())
 
 
     ###################################
@@ -201,7 +199,7 @@ class Environment:
         if self.DYNAMICS_DELAY > 0:
             self.action_delay_queue = queue.Queue(maxsize = self.DYNAMICS_DELAY + 1)
             for i in range(self.DYNAMICS_DELAY):
-                self.action_delay_queue.put(np.zeros(self.ACTION_SIZE + 1), False)
+                self.action_delay_queue.put(np.zeros(self.ACTION_SIZE), False)
 
 
     def update_docking_locations(self):
@@ -349,7 +347,7 @@ class Environment:
             reward -= self.TARGET_COLLISION_PENALTY
 
         # Multiplying the reward by the TIMESTEP to give the rewards on a per-second basis
-        return (reward*self.TIMESTEP).squeeze()
+        return reward*self.TIMESTEP # possibly add .squeeze() if the shape is not ()
 
 
     def is_done(self):
@@ -436,20 +434,20 @@ class Environment:
         # Loop until the process is terminated
         while True:
             # Blocks until the agent passes us an action
-            action, *test_time = self.agent_to_env.get()        
+            action, *test_time = self.agent_to_env.get()
 
             if type(action) == bool:
                 # The signal to reset the environment was received
                 self.reset(action, test_time[0])
                 
                 # Return the TOTAL_STATE
-                self.env_to_agent.put(np.concatenate([self.relative_pose_body_frame(self), self.chaser_position, self.target_position, self.chaser_velocity, self.target_velocity]))
+                self.env_to_agent.put(np.concatenate([self.relative_pose_body_frame(), self.chaser_position, self.target_position, self.chaser_velocity, self.target_velocity]))
 
             else:
                 # Delay the action by DYNAMICS_DELAY timesteps. The environment accumulates the action delay--the agent still thinks the sent action was used.
                 if self.DYNAMICS_DELAY > 0:
                     self.action_delay_queue.put(action,False) # puts the current action to the bottom of the stack
-                    action = self.action_delay_queue.get(False) # grabs the delayed action and treats it as truth.                
+                    action = self.action_delay_queue.get(False) # grabs the delayed action and treats it as truth.   
 
                 ################################
                 ##### Step the environment #####
@@ -457,7 +455,7 @@ class Environment:
                 reward, done = self.step(action)
 
                 # Return (TOTAL_STATE, reward, done)
-                self.env_to_agent.put((np.concatenate([self.relative_pose_body_frame(self), self.chaser_position, self.target_position, self.chaser_velocity, self.target_velocity]), reward, done))
+                self.env_to_agent.put((np.concatenate([self.relative_pose_body_frame(), self.chaser_position, self.target_position, self.chaser_velocity, self.target_velocity]), reward, done))
 
 
 ###################################################################
@@ -531,15 +529,15 @@ def render(states, actions, instantaneous_reward_log, cumulative_reward_log, cri
     ########################################################
     
     # All the points to draw of the chaser (except the front-face)    
-    chaser_points_body = np.array([[[ LENGTH/2],[-LENGTH/2]],
-                                   [[-LENGTH/2],[-LENGTH/2]],
-                                   [[-LENGTH/2],[ LENGTH/2]],
-                                   [[ LENGTH/2],[ LENGTH/2]],
+    chaser_points_body = np.array([[ LENGTH/2,-LENGTH/2],
+                                   [-LENGTH/2,-LENGTH/2],
+                                   [-LENGTH/2, LENGTH/2],
+                                   [ LENGTH/2, LENGTH/2],
                                    [ARM_MOUNT_POSITION[0],ARM_MOUNT_POSITION[1]],
                                    [SHOULDER_POSITION[0],SHOULDER_POSITION[1]],
                                    [ELBOW_POSITION[0],ELBOW_POSITION[1]],
                                    [WRIST_POSITION[0],WRIST_POSITION[1]],
-                                   [END_EFFECTOR_POSITION[0],END_EFFECTOR_POSITION[1]]]).squeeze().T
+                                   [END_EFFECTOR_POSITION[0],END_EFFECTOR_POSITION[1]]]).T
     
     # The front-face points on the target
     chaser_front_face_body = np.array([[[ LENGTH/2],[ LENGTH/2]],
@@ -549,21 +547,21 @@ def render(states, actions, instantaneous_reward_log, cumulative_reward_log, cri
     C_Ib_chaser = np.moveaxis(np.array([[np.cos(chaser_theta), -np.sin(chaser_theta)],
                                         [np.sin(chaser_theta),  np.cos(chaser_theta)]]), source = 2, destination = 0) # [NUM_TIMESTEPS, 2, 2]
     
-    # Rotating body frame coordinates to inertial frame
+    # Rotating body frame coordinates to inertial frame    
     chaser_body_inertial       = np.matmul(C_Ib_chaser, chaser_points_body)     + np.array([chaser_x, chaser_y]).T.reshape([-1,2,1])
     chaser_front_face_inertial = np.matmul(C_Ib_chaser, chaser_front_face_body) + np.array([chaser_x, chaser_y]).T.reshape([-1,2,1])
 
 
       
     # All the points to draw of the target (except the front-face)     
-    target_points_body = np.array([[[ LENGTH/2],[-LENGTH/2]],
-                                   [[-LENGTH/2],[-LENGTH/2]],
-                                   [[-LENGTH/2],[ LENGTH/2]],
-                                   [[ LENGTH/2],[ LENGTH/2]],
+    target_points_body = np.array([[ LENGTH/2,-LENGTH/2],
+                                   [-LENGTH/2,-LENGTH/2],
+                                   [-LENGTH/2, LENGTH/2],
+                                   [ LENGTH/2, LENGTH/2],
                                    [DOCKING_PORT_POSITION[0],DOCKING_PORT_POSITION[1]],
                                    [DOCKING_PORT_POSITION[0]+0.05,DOCKING_PORT_POSITION[1]+0.1],
                                    [DOCKING_PORT_POSITION[0]-0.05,DOCKING_PORT_POSITION[1]+0.1],
-                                   [DOCKING_PORT_POSITION[0],DOCKING_PORT_POSITION[1]]]).squeeze().T
+                                   [DOCKING_PORT_POSITION[0],DOCKING_PORT_POSITION[1]]]).T
     
     # The front-face points on the target
     target_front_face_body = np.array([[[ LENGTH/2],[ LENGTH/2]],
@@ -636,7 +634,7 @@ def render(states, actions, instantaneous_reward_log, cumulative_reward_log, cri
 
     # Defining plotting objects that change each frame
     chaser_body,       = subfig1.plot([], [], color = 'r', linestyle = '-', linewidth = 2) # Note, the comma is needed
-    chaser_front_face, = subfig1.plot([], [], color = 'r', linestyle = '-', linewidth = 2) # Note, the comma is needed
+    chaser_front_face, = subfig1.plot([], [], color = 'k', linestyle = '-', linewidth = 2) # Note, the comma is needed
     target_body,       = subfig1.plot([], [], color = 'g', linestyle = '-', linewidth = 2)
     target_front_face, = subfig1.plot([], [], color = 'k', linestyle = '-', linewidth = 2)
     chaser_body_dot    = subfig1.scatter(0., 0., color = 'r', s = 0.1)
@@ -650,9 +648,9 @@ def render(states, actions, instantaneous_reward_log, cumulative_reward_log, cri
         time_text            = subfig1.text2D(x = 0.2, y = 0.91, s = '', fontsize = 8, transform=subfig1.transAxes)
         reward_text          = subfig1.text2D(x = 0.0,  y = 1.02, s = '', fontsize = 8, transform=subfig1.transAxes)
     else:        
-        time_text    = subfig1.text2D(x = 0.1, y = 0.9, s = '', fontsize = 8, transform=subfig1.transAxes)
-        reward_text  = subfig1.text2D(x = 0.62, y = 0.9, s = '', fontsize = 8, transform=subfig1.transAxes)
-        episode_text = subfig1.text2D(x = 0.4, y = 0.96, s = '', fontsize = 8, transform=subfig1.transAxes)
+        time_text    = subfig1.text(x = 0.1, y = 0.9, s = '', fontsize = 8, transform=subfig1.transAxes)
+        reward_text  = subfig1.text(x = 0.62, y = 0.9, s = '', fontsize = 8, transform=subfig1.transAxes)
+        episode_text = subfig1.text(x = 0.4, y = 0.96, s = '', fontsize = 8, transform=subfig1.transAxes)
         episode_text.set_text('Episode ' + str(episode_number))
 
     # Function called repeatedly to draw each frame

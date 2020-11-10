@@ -7,7 +7,6 @@
 
 
 """
-import numpy as np
 
 class Settings:
 
@@ -16,9 +15,9 @@ class Settings:
     ##### Run Settings #####
     ########################
 
-    RUN_NAME               = 'no_altitude_vel_N1' # use just the name. If trying to restore from file, use name along with timestamp
-    ENVIRONMENT            = 'quad1' # 'quad1' for Task 1 velocity; 'quad1_accel' for Task 1 accel; 'quad1_runway' for Task 2 accel
-    AGENT                  = '' # '' for Task 1, '_runway' for runway experiment
+    RUN_NAME               = 'first_test_10actors' # use just the name. If trying to restore from file, use name along with timestamp
+    ENVIRONMENT            = 'SPOT'
+    AGENT                  = ''
     RECORD_VIDEO           = True
     VIDEO_RECORD_FREQUENCY = 20 # 20 Multiples of "CHECK_GREEDY_PERFORMANCE_EVERY_NUM_EPISODES"
     NOISELESS_AT_TEST_TIME = True # Whether or not to test without action noise (Keep at True unless debugging)
@@ -125,23 +124,13 @@ class Settings:
     N_STEP_RETURN                    = env.N_STEP_RETURN
     TIMESTEP                         = env.TIMESTEP
     MAX_NUMBER_OF_TIMESTEPS          = env.MAX_NUMBER_OF_TIMESTEPS # per episode
-    NUMBER_OF_QUADS                  = env.NUMBER_OF_QUADS
-    irrelevant_states = []
-    for i in range(NUMBER_OF_QUADS):
-        for irrelevant_state in env.IRRELEVANT_STATES:
-            irrelevant_states.append(i * 6 + irrelevant_state)
-    IRRELEVANT_STATES = np.asarray(irrelevant_states)
+    IRRELEVANT_STATES                = env.IRRELEVANT_STATES
     TEST_ON_DYNAMICS                 = env.TEST_ON_DYNAMICS
     KINEMATIC_NOISE                  = env.KINEMATIC_NOISE
     TOTAL_STATE_SIZE                 = env.TOTAL_STATE_SIZE
     AUGMENT_STATE_WITH_ACTION_LENGTH = env.AUGMENT_STATE_WITH_ACTION_LENGTH
     VELOCITY_LIMIT                   = env.VELOCITY_LIMIT
-    RUNWAY_LENGTH_ELEMENTS           = env.RUNWAY_LENGTH_ELEMENTS
-    RUNWAY_WIDTH_ELEMENTS            = env.RUNWAY_WIDTH_ELEMENTS
-    RUNWAY_LENGTH                    = env.RUNWAY_LENGTH
-    RUNWAY_WIDTH                     = env.RUNWAY_WIDTH
-    MINIMUM_CAMERA_ALTITUDE          = env.MINIMUM_CAMERA_ALTITUDE
-    MAXIMUM_CAMERA_ALTITUDE          = env.MAXIMUM_CAMERA_ALTITUDE
+
             
     # Delete the test environment
     del env

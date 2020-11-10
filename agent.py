@@ -200,7 +200,6 @@ class Agent:
                     cumulative_reward_log = []
                     done_log = []
                     discount_factor_log = []
-                    guidance_position_log = []
                     raw_total_state_log.append(total_state)
                     
 
@@ -257,7 +256,7 @@ class Agent:
                 self.agent_to_env.put((np.concatenate([action, np.zeros([1])]),))
 
                 # Receive results from stepped environment
-                next_total_state, reward, done, *guidance_position = self.env_to_agent.get() # The * means the variable will be unpacked only if it exists
+                next_total_state, reward, done = self.env_to_agent.get() # The * means the variable will be unpacked only if it exists
 
                 # Add reward we just received to running total for this episode
                 episode_reward += reward
@@ -309,7 +308,6 @@ class Agent:
                         instantaneous_reward_log.append(n_step_reward)
                         done_log.append(done)
                         discount_factor_log.append(discount_factor)
-                        guidance_position_log.append(guidance_position)
 
                 # End of timestep -> next state becomes current state
                 observation = next_observation
@@ -345,7 +343,6 @@ class Agent:
                             instantaneous_reward_log.append(n_step_reward)
                             done_log.append(done)
                             discount_factor_log.append(discount_factor)
-                            guidance_position_log.append(guidance_position)
 
             ################################
             ####### Episode Complete #######
@@ -367,7 +364,7 @@ class Agent:
                     bins = np.linspace(Settings.MIN_V, Settings.MAX_V, Settings.NUMBER_OF_BINS)
 
                     # Render the episode
-                    environment_file.render(np.asarray(raw_total_state_log), np.asarray(action_log), np.asarray(instantaneous_reward_log), np.asarray(cumulative_reward_log), critic_distributions, target_critic_distributions, projected_target_distribution, bins, np.asarray(loss_log), np.squeeze(np.asarray(guidance_position_log)), episode_number, self.filename, Settings.MODEL_SAVE_DIRECTORY)
+                    environment_file.render(np.asarray(raw_total_state_log), np.asarray(action_log), np.asarray(instantaneous_reward_log), np.asarray(cumulative_reward_log), critic_distributions, target_critic_distributions, projected_target_distribution, bins, np.asarray(loss_log), episode_number, self.filename, Settings.MODEL_SAVE_DIRECTORY)
 
                 except queue.Empty:
                     print("Skipping this animation!")

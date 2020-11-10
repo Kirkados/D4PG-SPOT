@@ -81,11 +81,11 @@ class Environment:
         self.LOWER_STATE_BOUND                = np.array([-3., -3., -self.VELOCITY_LIMIT, -self.VELOCITY_LIMIT, -2*np.pi, -np.pi/6, -3., -3., -2*np.pi, -3., -3., -2*np.pi, -self.VELOCITY_LIMIT, -self.VELOCITY_LIMIT, -np.pi/6, -self.VELOCITY_LIMIT, -self.VELOCITY_LIMIT, -np.pi/6]) # [m, m, m/s, m/s, rad, rad/s, m, m, rad, m, m, rad, m/s, m/s, rad/s, m/s, m/s, rad/s] // lower bound for each element of TOTAL_STATE
         self.UPPER_STATE_BOUND                = np.array([ 3.,  3.,  self.VELOCITY_LIMIT,  self.VELOCITY_LIMIT,  2*np.pi,  np.pi/6,  3.,  3.,  2*np.pi,  3.,  3.,  2*np.pi,  self.VELOCITY_LIMIT,  self.VELOCITY_LIMIT,  np.pi/6,  self.VELOCITY_LIMIT,  self.VELOCITY_LIMIT,  np.pi/6]) # [m, m, m,s, m,s, rad, rad/s, m, m, rad, m, m, rad, m/s, m/s, rad/s, m/s, m/s, rad/s] // upper bound for each element of TOTAL_STATE
         self.INITIAL_CHASER_POSITION          = np.array([3.0, 1.2, 0.0]) # [m, m, rad]
-        self.INITIAL_CHASER_VELOCITY          = np.array([0.0, 0.0, 0.0]) # [m/s, m/s, rad/s]
+        self.INITIAL_CHASER_VELOCITY          = np.array([1.0, 0.0, 0.0]) # [m/s, m/s, rad/s]
         self.INITIAL_TARGET_POSITION          = np.array([2.0, 1.0, 0.0]) # [m, m, rad]
         self.INITIAL_TARGET_VELOCITY          = np.array([0.0, 0.0, 0.0]) # [m/s, m/s, rad/s]
         self.NORMALIZE_STATE                  = True # Normalize state on each timestep to avoid vanishing gradients
-        self.RANDOMIZE                        = True # whether or not to RANDOMIZE the state & target location
+        self.RANDOMIZE                        = False # whether or not to RANDOMIZE the state & target location
         self.RANDOMIZATION_LENGTH             = 1 # [m] standard deviation of position randomization
         self.RANDOMIZATION_ANGLE              = np.pi/2 # [rad] standard deviation of angular randomization
         self.RANDOMIZATION_TARGET_VELOCITY    = 0.0 # [m/s] standard deviation of the target's velocity randomization
@@ -101,6 +101,17 @@ class Environment:
         self.ADDITIONAL_VALUE_INFO            = False # whether or not to include additional reward and value distribution information on the animations
         self.SKIP_FAILED_ANIMATIONS           = True # Error the program or skip when animations fail?
 
+        # Physical properties
+        self.LENGTH                = 0.3  # [m] side length
+        self.MASS                  = 10.0   # [kg] for chaser
+        self.INERTIA               = 1/12*self.MASS*(self.LENGTH**2 + self.LENGTH**2) # 0.15 [kg m^2]
+        self.DOCKING_PORT_POSITION = [-self.LENGTH/2, 0] # position of the docking cone on the target in its body frame
+        self.ARM_MOUNT_POSITION    = [0, self.LENGTH/2] # [m] position of the arm mounting point on the chaser in the body frame
+        self.SHOULDER_POSITION     = self.ARM_MOUNT_POSITION + [0, 0.05] # [m] position of the arm's shoulder in the chaser body frame
+        self.ELBOW_POSITION        = self.SHOULDER_POSITION + [0, 0.3] # [m] position of the arm's elbow in the chaser body frame
+        self.WRIST_POSITION        = self.ELBOW_POSITION + [0.3*np.cos(np.pi/4),0.3*np.sin(np.pi/4)] # [m] position of the arm's wrist in the chaser body frame
+        self.END_EFFECTOR_POSITION = self.WRIST_POSITION + [0.1, 0] # po sition of the optimally-deployed end-effector on the chaser in the body frame
+        
         # Reward function properties
         self.DOCKING_REWARD              = 100 # A lump-sum given to the chaser when it docks
         self.SUCCESSFUL_DOCKING_DISTANCE = 0.01 # [m] distance at which the magnetic docking can occur
@@ -110,13 +121,6 @@ class Environment:
         self.TARGET_COLLISION_DISTANCE   = np.sqrt(2)*self.LENGTH # [m] how close chaser and target need to be before a penalty is applied
         self.END_ON_FALL                 = False # end episode on a fall off the table        
         self.FALL_OFF_TABLE_PENALTY      = 100.
-
-        # Physical properties
-        self.LENGTH                = 0.3  # [m] side length
-        self.MASS                  = 10.0   # [kg] for chaser
-        self.INERTIA               = 1/12*self.MASS*(self.LENGTH**2 + self.LENGTH**2) # 0.15 [kg m^2]
-        self.END_EFFECTOR_POSITION = [self.LENGTH, self.LENGTH] # position of the optimally-deployed end-effector on the chaser in the body frame
-        self.DOCKING_PORT_POSITION = [-self.LENGTH/2, 0] # position of the docking cone on the target in irs body frame
         
         # Test time properties
         self.TEST_ON_DYNAMICS            = True # Whether or not to use full dynamics along with a PD controller at test time
@@ -131,12 +135,18 @@ class Environment:
         self.LOWER_STATE_BOUND        = np.concatenate([self.LOWER_STATE_BOUND, np.tile(self.LOWER_ACTION_BOUND, self.AUGMENT_STATE_WITH_ACTION_LENGTH)]) # lower bound for each element of TOTAL_STATE
         self.UPPER_STATE_BOUND        = np.concatenate([self.UPPER_STATE_BOUND, np.tile(self.UPPER_ACTION_BOUND, self.AUGMENT_STATE_WITH_ACTION_LENGTH)]) # upper bound for each element of TOTAL_STATE        
         self.OBSERVATION_SIZE         = self.TOTAL_STATE_SIZE - len(self.IRRELEVANT_STATES) # the size of the observation input to the policy
+        
+        
+        self.reset(False,False)
+        print(self.relative_pose_body_frame())
+
 
     ###################################
     ##### Seeding the environment #####
     ###################################
     def seed(self, seed):
         np.random.seed(seed)
+
 
     ######################################
     ##### Resettings the Environment #####
@@ -158,7 +168,7 @@ class Environment:
             # Randomizing initial state in Inertial frame
             self.chaser_position = self.INITIAL_CHASER_POSITION + np.random.randn(3)*[self.RANDOMIZATION_LENGTH, self.RANDOMIZATION_LENGTH, self.RANDOMIZATION_ANGLE]
             # Randomizing target state in Inertial frame
-            self.target_location = self.INITIAL_TARGET_POSITION + np.random.randn(3)*[self.RANDOMIZATION_LENGTH, self.RANDOMIZATION_LENGTH, self.RANDOMIZATION_ANGLE]
+            self.target_position = self.INITIAL_TARGET_POSITION + np.random.randn(3)*[self.RANDOMIZATION_LENGTH, self.RANDOMIZATION_LENGTH, self.RANDOMIZATION_ANGLE]
             # Randomizing target velocity in Inertial frame
             self.target_velocity = self.INITIAL_TARGET_VELOCITY + np.random.randn(3)*[self.RANDOMIZATION_TARGET_VELOCITY, self.RANDOMIZATION_TARGET_VELOCITY, self.RANDOMIZATION_TARGET_OMEGA]
             
@@ -167,7 +177,7 @@ class Environment:
             # Constant initial state in Inertial frame
             self.chaser_position = self.INITIAL_CHASER_POSITION
             # Constant target location in Inertial frame
-            self.target_location = self.INITIAL_TARGET_POSITION
+            self.target_position = self.INITIAL_TARGET_POSITION
             # Constant target velocity in Inertial frame
             self.target_velocity = self.INITIAL_TARGET_VELOCITY
         
@@ -179,7 +189,7 @@ class Environment:
 
         # Initializing the previous velocity and control effort for the integral-acceleration controller
         self.previous_velocity = np.zeros(len(self.INITIAL_CHASER_VELOCITY))
-        self.previous_control_effort = np.zeros(len(self.ACTION_SIZE))
+        self.previous_control_effort = np.zeros(self.ACTION_SIZE)
                 
         if use_dynamics:            
             self.dynamics_flag = True # for this episode, dynamics will be used
@@ -193,11 +203,19 @@ class Environment:
             for i in range(self.DYNAMICS_DELAY):
                 self.action_delay_queue.put(np.zeros(self.ACTION_SIZE + 1), False)
 
+
     def update_docking_locations(self):
         # Updates the position of the end-effector and the docking port in the Inertial frame
-        #TODO: finish this
-        self.end_effector_position = 0
-        self.docking_port_position = 0
+        
+        # Make rotation matrices        
+        C_Ib_chaser = self.make_C_bI(self.chaser_position[-1])
+        C_Ib_target = self.make_C_bI(self.target_position[-1])
+        
+        # Position in Inertial = Body position (inertial) + C_Ib * EE position in body
+        self.end_effector_position = self.chaser_position[:-1] + np.matmul(C_Ib_chaser, self.END_EFFECTOR_POSITION)
+        self.docking_port_position = self.target_position[:-1] + np.matmul(C_Ib_target, self.DOCKING_PORT_POSITION)
+        
+        
     #####################################
     ##### Step the Dynamics forward #####
     #####################################
@@ -251,7 +269,7 @@ class Environment:
 
 
         # Step target's state ahead one timestep
-        self.target_location += self.INITIAL_TARGET_VELOCITY * self.TIMESTEP
+        self.target_position += self.INITIAL_TARGET_VELOCITY * self.TIMESTEP
 
         # Update docking locations
         self.update_docking_locations()
@@ -327,7 +345,7 @@ class Environment:
             #TODO: docking penalties
         
         # Giving a penalty for colliding with the target
-        if np.linalg.norm(self.chaser_position[:-1] - self.target_location[:-1]) <= self.TARGET_COLLISION_DISTANCE:
+        if np.linalg.norm(self.chaser_position[:-1] - self.target_position[:-1]) <= self.TARGET_COLLISION_DISTANCE:
             reward -= self.TARGET_COLLISION_PENALTY
 
         # Multiplying the reward by the TIMESTEP to give the rewards on a per-second basis
@@ -364,32 +382,38 @@ class Environment:
 
         return self.agent_to_env, self.env_to_agent
     
+    
+    def make_C_bI(self, angle):
+        
+        C_bI = np.array([[ np.cos(angle), np.sin(angle)],
+                         [-np.sin(angle), np.cos(angle)]]) # [2, 2]        
+        return C_bI
+    
+    
     def relative_pose_body_frame(self):
         # Calculate the relative_x, relative_y, relative_vx, relative_vy, relative_angle, relative_angular_velocity
         # All in the body frame
                 
-        chaser_angle = self.chaser_location[-1]        
+        chaser_angle = self.chaser_position[-1]        
         # Rotation matrix (inertial -> body)
-        C_bI = np.array([[ np.cos(chaser_angle), np.sin(chaser_angle)],
-                         [-np.sin(chaser_angle), np.cos(chaser_angle)]]) # [2, 2]
+        C_bI = self.make_C_bI(chaser_angle)
                 
         # [X,Y] relative position in inertial frame
-        relative_position_inertial = self.target_location[:-1] - self.chaser_location[:-1]    
+        relative_position_inertial = self.target_position[:-1] - self.chaser_position[:-1]    
         relative_position_body = np.matmul(C_bI, relative_position_inertial)
         
         # [X, Y] Relative velocity in inertial frame
         relative_velocity_inertial = self.target_velocity[:-1] - self.chaser_velocity[:-1]
         relative_velocity_body = np.matmul(C_bI, relative_velocity_inertial)
         
-        # Relative angle
-        relative_angle = self.target_location[-1] - self.chaser_location[-1]
+        # Relative angle and wrap it to [0, 2*np.pi]
+        relative_angle = np.array([(self.target_position[-1] - self.chaser_position[-1])%(2*np.pi)])
         
         # Relative angular velocity
-        relative_angular_velocity = self.target_velocity[-1] - self.chaser_velocity[-1]
-        
-        start here testing this
-        
+        relative_angular_velocity = np.array([self.target_velocity[-1] - self.chaser_velocity[-1]])
+
         return np.concatenate([relative_position_body, relative_velocity_body, relative_angle, relative_angular_velocity])
+
 
     def run(self):
         ###################################
@@ -419,7 +443,7 @@ class Environment:
                 self.reset(action, test_time[0])
                 
                 # Return the TOTAL_STATE
-                self.env_to_agent.put(np.concatenate([self.relative_pose_body_frame(self), self.chaser_location, self.target_location, self.chaser_velocity, self.target_velocity]))
+                self.env_to_agent.put(np.concatenate([self.relative_pose_body_frame(self), self.chaser_position, self.target_position, self.chaser_velocity, self.target_velocity]))
 
             else:
                 # Delay the action by DYNAMICS_DELAY timesteps. The environment accumulates the action delay--the agent still thinks the sent action was used.
@@ -433,7 +457,8 @@ class Environment:
                 reward, done = self.step(action)
 
                 # Return (TOTAL_STATE, reward, done)
-                self.env_to_agent.put((np.concatenate([self.relative_pose_body_frame(self), self.chaser_location, self.target_location, self.chaser_velocity, self.target_velocity]), reward, done))
+                self.env_to_agent.put((np.concatenate([self.relative_pose_body_frame(self), self.chaser_position, self.target_position, self.chaser_velocity, self.target_velocity]), reward, done))
+
 
 ###################################################################
 ##### Generating kinematics equations representing the motion #####
@@ -445,12 +470,12 @@ def kinematics_equations_of_motion(state, t, parameters):
     action = parameters[0]
     position_length = parameters[1]
     
-    # state is [position, velocity]
+    # state is [chaser position, chaser velocity]
     # its derivative is [velocity, acceleration]
-    #position = state[:position_length] # [x, y, z]
-    velocity = state[position_length:] # [x_dot, y_dot, z_dot]
+    #position = state[:position_length] # [x, y, theta]
+    velocity = state[position_length:] # [x_dot, y_dot, theta_dot]
     
-    acceleration = action # [x_dot_dot, y_dot_dot, z_dot_dot]
+    acceleration = action # [x_dot_dot, y_dot_dot, theta_dot_dot]
 
     # Building the derivative matrix.
     derivatives = np.concatenate([velocity, acceleration])
@@ -465,20 +490,22 @@ def dynamics_equations_of_motion(state, t, parameters):
     # state = [chaser_x, chaser_y, chaser_z, chaser_theta, chaser_Vx, chaser_Vy, chaser_Vz]
 
     # Unpacking the state
-    x, y, z, xdot, ydot, zdot = state
+    x, y, theta, xdot, ydot, thetadot = state
     control_effort, mass, inertia = parameters # unpacking parameters
-
-    derivatives = np.array((xdot, ydot, zdot, control_effort[0]/mass, control_effort[1]/mass, control_effort[2]/mass)).squeeze()
     
-    #print("The achieved acceleration is ", control_effort[0]/mass, control_effort[1]/mass, control_effort[2]/mass, control_effort[3]/inertia)
-
+    # Building the derivative matrix
+    derivatives = np.array((xdot, ydot, thetadot, control_effort[0]/mass, control_effort[1]/mass, control_effort[2]/inertia)).squeeze()
+  
     return derivatives
 
 
 ##########################################
 ##### Function to animate the motion #####
 ##########################################
-def render(states, actions, instantaneous_reward_log, cumulative_reward_log, critic_distributions, target_critic_distributions, projected_target_distribution, bins, loss_log, guidance_position_log, episode_number, filename, save_directory):
+def render(states, actions, instantaneous_reward_log, cumulative_reward_log, critic_distributions, target_critic_distributions, projected_target_distribution, bins, loss_log, episode_number, filename, save_directory):
+    """
+    TOTAL_STATE = [relative_x, relative_y, relative_vx, relative_vy, relative_angle, relative_angular_velocity, chaser_x, chaser_y, chaser_theta, target_x, target_y, target_theta, chaser_vx, chaser_vy, chaser_omega, target_vx, target_vy, target_omega] *# Relative pose expressed in the chaser's body frame; everythign else in Inertial frame #*
+     """   
     
     # Load in a temporary environment, used to grab the physical parameters
     temp_env = Environment()
@@ -487,83 +514,81 @@ def render(states, actions, instantaneous_reward_log, cumulative_reward_log, cri
     extra_information = temp_env.ADDITIONAL_VALUE_INFO
 
     # Unpacking state
-    chaser_x, chaser_y, chaser_z = states[:,0], states[:,1], states[:,2]
-    
-    # Assigning the chaser a fixed attitude
-    chaser_theta = np.zeros(len(chaser_x))
-    
-    target_x, target_y, target_z, target_theta = states[:,3], states[:,4], states[:,5], states[:,6]
+    chaser_x, chaser_y, chaser_theta = states[:,6], states[:,7], states[:,8]
+    target_x, target_y, target_theta = states[:,9], states[:,10], states[:,11]
 
     # Extracting physical properties
-    length = temp_env.LENGTH
+    LENGTH = temp_env.LENGTH
+    DOCKING_PORT_POSITION = temp_env.DOCKING_PORT_POSITION
+    ARM_MOUNT_POSITION = temp_env.ARM_MOUNT_POSITION
+    SHOULDER_POSITION = temp_env.SHOULDER_POSITION
+    ELBOW_POSITION = temp_env.ELBOW_POSITION
+    WRIST_POSITION = temp_env.WRIST_POSITION
+    END_EFFECTOR_POSITION = temp_env.END_EFFECTOR_POSITION
 
-    ### Calculating spacecraft corner locations through time ###
+    ########################################################
+    # Calculating spacecraft corner locations through time #
+    ########################################################
     
-    # Corner locations in body frame    
-    chaser_body_body_frame = length/2.*np.array([[[1],[-1],[1]],
-                                                [[-1],[-1],[1]],
-                                                [[-1],[-1],[-1]],
-                                                [[1],[-1],[-1]],
-                                                [[-1],[-1],[-1]],
-                                                [[-1],[1],[-1]],
-                                                [[1],[1],[-1]],
-                                                [[-1],[1],[-1]],
-                                                [[-1],[1],[1]],
-                                                [[1],[1],[1]],
-                                                [[-1],[1],[1]],
-                                                [[-1],[-1],[1]]]).squeeze().T
+    # All the points to draw of the chaser (except the front-face)    
+    chaser_points_body = np.array([[[ LENGTH/2],[-LENGTH/2]],
+                                   [[-LENGTH/2],[-LENGTH/2]],
+                                   [[-LENGTH/2],[ LENGTH/2]],
+                                   [[ LENGTH/2],[ LENGTH/2]],
+                                   [ARM_MOUNT_POSITION[0],ARM_MOUNT_POSITION[1]],
+                                   [SHOULDER_POSITION[0],SHOULDER_POSITION[1]],
+                                   [ELBOW_POSITION[0],ELBOW_POSITION[1]],
+                                   [WRIST_POSITION[0],WRIST_POSITION[1]],
+                                   [END_EFFECTOR_POSITION[0],END_EFFECTOR_POSITION[1]]]).squeeze().T
     
-    chaser_front_face_body_frame = length/2.*np.array([[[1],[-1],[1]],
-                                                       [[1],[1],[1]],
-                                                       [[1],[1],[-1]],
-                                                       [[1],[-1],[-1]],
-                                                       [[1],[-1],[1]]]).squeeze().T
+    # The front-face points on the target
+    chaser_front_face_body = np.array([[[ LENGTH/2],[ LENGTH/2]],
+                                       [[ LENGTH/2],[-LENGTH/2]]]).squeeze().T
 
     # Rotation matrix (body -> inertial)
-    C_Ib = np.moveaxis(np.array([[np.cos(chaser_theta),       -np.sin(chaser_theta),        np.zeros(len(chaser_theta))],
-                                 [np.sin(chaser_theta),        np.cos(chaser_theta),        np.zeros(len(chaser_theta))],
-                                 [np.zeros(len(chaser_theta)), np.zeros(len(chaser_theta)), np.ones(len(chaser_theta))]]), source = 2, destination = 0) # [NUM_TIMESTEPS, 3, 3]
+    C_Ib_chaser = np.moveaxis(np.array([[np.cos(chaser_theta), -np.sin(chaser_theta)],
+                                        [np.sin(chaser_theta),  np.cos(chaser_theta)]]), source = 2, destination = 0) # [NUM_TIMESTEPS, 2, 2]
     
     # Rotating body frame coordinates to inertial frame
-    chaser_body_inertial       = np.matmul(C_Ib, chaser_body_body_frame)       + np.array([chaser_x, chaser_y, chaser_z]).T.reshape([-1,3,1])
-    chaser_front_face_inertial = np.matmul(C_Ib, chaser_front_face_body_frame) + np.array([chaser_x, chaser_y, chaser_z]).T.reshape([-1,3,1])
+    chaser_body_inertial       = np.matmul(C_Ib_chaser, chaser_points_body)     + np.array([chaser_x, chaser_y]).T.reshape([-1,2,1])
+    chaser_front_face_inertial = np.matmul(C_Ib_chaser, chaser_front_face_body) + np.array([chaser_x, chaser_y]).T.reshape([-1,2,1])
 
-    ### Calculating target spacecraft corner locations through time ###
+
+      
+    # All the points to draw of the target (except the front-face)     
+    target_points_body = np.array([[[ LENGTH/2],[-LENGTH/2]],
+                                   [[-LENGTH/2],[-LENGTH/2]],
+                                   [[-LENGTH/2],[ LENGTH/2]],
+                                   [[ LENGTH/2],[ LENGTH/2]],
+                                   [DOCKING_PORT_POSITION[0],DOCKING_PORT_POSITION[1]],
+                                   [DOCKING_PORT_POSITION[0]+0.05,DOCKING_PORT_POSITION[1]+0.1],
+                                   [DOCKING_PORT_POSITION[0]-0.05,DOCKING_PORT_POSITION[1]+0.1],
+                                   [DOCKING_PORT_POSITION[0],DOCKING_PORT_POSITION[1]]]).squeeze().T
     
-    # Corner locations in body frame    
-    target_body_frame = length/2.*np.array([[[1],[-1],[1]],
-                                           [[-1],[-1],[1]],
-                                           [[-1],[-1],[-1]],
-                                           [[1],[-1],[-1]],
-                                           [[-1],[-1],[-1]],
-                                           [[-1],[1],[-1]],
-                                           [[1],[1],[-1]],
-                                           [[-1],[1],[-1]],
-                                           [[-1],[1],[1]],
-                                           [[1],[1],[1]],
-                                           [[-1],[1],[1]],
-                                           [[-1],[-1],[1]]]).squeeze().T
-        
-    target_front_face_body_frame = length/2.*np.array([[[1],[-1],[1]],
-                                                       [[1],[1],[1]],
-                                                       [[1],[1],[-1]],
-                                                       [[1],[-1],[-1]],
-                                                       [[1],[-1],[1]]]).squeeze().T
+    # The front-face points on the target
+    target_front_face_body = np.array([[[ LENGTH/2],[ LENGTH/2]],
+                                       [[ LENGTH/2],[-LENGTH/2]]]).squeeze().T
 
     # Rotation matrix (body -> inertial)
-    C_Ib = np.moveaxis(np.array([[np.cos(target_theta),       -np.sin(target_theta),        np.zeros(len(target_theta))],
-                                 [np.sin(target_theta),        np.cos(target_theta),        np.zeros(len(target_theta))],
-                                 [np.zeros(len(target_theta)), np.zeros(len(target_theta)), np.ones(len(target_theta))]]), source = 2, destination = 0) # [NUM_TIMESTEPS, 3, 3]
-    target_body_inertial = np.matmul(C_Ib, target_body_frame)+ np.array([target_x, target_y, target_z]).T.reshape([-1,3,1])
-    target_front_face_inertial = np.matmul(C_Ib, target_front_face_body_frame) + np.array([target_x, target_y, target_z]).T.reshape([-1,3,1])
+    C_Ib_target = np.moveaxis(np.array([[np.cos(target_theta), -np.sin(target_theta)],
+                                        [np.sin(target_theta),  np.cos(target_theta)]]), source = 2, destination = 0) # [NUM_TIMESTEPS, 2, 2]
+    
+    # Rotating body frame coordinates to inertial frame
+    target_body_inertial       = np.matmul(C_Ib_target, target_points_body)     + np.array([target_x, target_y]).T.reshape([-1,2,1])
+    target_front_face_inertial = np.matmul(C_Ib_target, target_front_face_body) + np.array([target_x, target_y]).T.reshape([-1,2,1])
 
+    #######################
+    # Plotting the motion #
+    #######################
+    
     # Generating figure window
     figure = plt.figure(constrained_layout = True)
     figure.set_size_inches(5, 4, True)
 
     if extra_information:
         grid_spec = gridspec.GridSpec(nrows = 2, ncols = 3, figure = figure)
-        subfig1 = figure.add_subplot(grid_spec[0,0], projection = '3d', aspect = 'equal', autoscale_on = False, xlim3d = (-5, 5), ylim3d = (-5, 5), zlim3d = (0, 10), xlabel = 'X (m)', ylabel = 'Y (m)', zlabel = 'Z (m)')
+        subfig1 = figure.add_subplot(grid_spec[0,0], aspect = 'equal', autoscale_on = False, xlim = (0, 3.5), ylim = (0, 2.4))
+        #subfig1 = figure.add_subplot(grid_spec[0,0], projection = '3d', aspect = 'equal', autoscale_on = False, xlim3d = (-5, 5), ylim3d = (-5, 5), zlim3d = (0, 10), xlabel = 'X (m)', ylabel = 'Y (m)', zlabel = 'Z (m)')
         subfig2 = figure.add_subplot(grid_spec[0,1], xlim = (np.min([np.min(instantaneous_reward_log), 0]) - (np.max(instantaneous_reward_log) - np.min(instantaneous_reward_log))*0.02, np.max([np.max(instantaneous_reward_log), 0]) + (np.max(instantaneous_reward_log) - np.min(instantaneous_reward_log))*0.02), ylim = (-0.5, 0.5))
         subfig3 = figure.add_subplot(grid_spec[0,2], xlim = (np.min(loss_log)-0.01, np.max(loss_log)+0.01), ylim = (-0.5, 0.5))
         subfig4 = figure.add_subplot(grid_spec[1,0], ylim = (0, 1.02))
@@ -606,20 +631,15 @@ def render(states, actions, instantaneous_reward_log, cumulative_reward_log, cri
         subfig6.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.])
 
     else:
-        subfig1 = figure.add_subplot(1, 1, 1, projection = '3d', aspect = 'equal', autoscale_on = False, xlim3d = (-5, 5), ylim3d = (-5, 5), zlim3d = (0, 10), xlabel = 'X (m)', ylabel = 'Y (m)', zlabel = 'Z (m)')
-    
-    # Setting the proper view
-    if temp_env.TOP_DOWN_VIEW:
-        subfig1.view_init(-90,0)
-    else:
-        subfig1.view_init(25, 190)        
+        subfig1 = figure.add_subplot(1, 1, 1, aspect = 'equal', autoscale_on = False, xlim = (0, 3.4), ylim = (0, 2.4), xlabel = 'X Position (m)', ylabel = 'Y Position (m)')
+     
 
     # Defining plotting objects that change each frame
-    chaser_body,       = subfig1.plot([], [], [], color = 'r', linestyle = '-', linewidth = 2) # Note, the comma is needed
-    chaser_front_face, = subfig1.plot([], [], [], color = 'r', linestyle = '-', linewidth = 2) # Note, the comma is needed
-    target_body,       = subfig1.plot([], [], [], color = 'g', linestyle = '-', linewidth = 2)
-    target_front_face, = subfig1.plot([], [], [], color = 'k', linestyle = '-', linewidth = 2)
-    chaser_body_dot    = subfig1.scatter(0., 0., 0., color = 'r', s = 0.1)
+    chaser_body,       = subfig1.plot([], [], color = 'r', linestyle = '-', linewidth = 2) # Note, the comma is needed
+    chaser_front_face, = subfig1.plot([], [], color = 'r', linestyle = '-', linewidth = 2) # Note, the comma is needed
+    target_body,       = subfig1.plot([], [], color = 'g', linestyle = '-', linewidth = 2)
+    target_front_face, = subfig1.plot([], [], color = 'k', linestyle = '-', linewidth = 2)
+    chaser_body_dot    = subfig1.scatter(0., 0., color = 'r', s = 0.1)
 
     if extra_information:
         reward_bar           = subfig2.barh(y = 0, height = 0.2, width = 0)
@@ -641,22 +661,18 @@ def render(states, actions, instantaneous_reward_log, cumulative_reward_log, cri
 
         # Draw the chaser body
         chaser_body.set_data(chaser_body_inertial[frame,0,:], chaser_body_inertial[frame,1,:])
-        chaser_body.set_3d_properties(chaser_body_inertial[frame,2,:])
 
         # Draw the front face of the chaser body in a different colour
         chaser_front_face.set_data(chaser_front_face_inertial[frame,0,:], chaser_front_face_inertial[frame,1,:])
-        chaser_front_face.set_3d_properties(chaser_front_face_inertial[frame,2,:])
 
         # Draw the target body
         target_body.set_data(target_body_inertial[frame,0,:], target_body_inertial[frame,1,:])
-        target_body.set_3d_properties(target_body_inertial[frame,2,:])
 
         # Draw the front face of the target body in a different colour
         target_front_face.set_data(target_front_face_inertial[frame,0,:], target_front_face_inertial[frame,1,:])
-        target_front_face.set_3d_properties(target_front_face_inertial[frame,2,:])
 
         # Drawing a dot in the centre of the chaser
-        chaser_body_dot._offsets3d = ([chaser_x[frame]],[chaser_y[frame]],[chaser_z[frame]])
+        chaser_body_dot.set_offsets(np.hstack((chaser_x[frame],chaser_y[frame])))
 
         # Update the time text
         time_text.set_text('Time = %.1f s' %(frame*temp_env.TIMESTEP))

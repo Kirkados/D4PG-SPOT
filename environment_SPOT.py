@@ -87,7 +87,7 @@ class Environment:
         self.INITIAL_TARGET_VELOCITY          = np.array([0.0, 0.0, 0.0]) # [m/s, m/s, rad/s]
         self.NORMALIZE_STATE                  = True # Normalize state on each timestep to avoid vanishing gradients
         self.RANDOMIZE                        = True # whether or not to RANDOMIZE the state & target location
-        self.RANDOMIZATION_LENGTH             = 1 # [m] standard deviation of position randomization
+        self.RANDOMIZATION_LENGTH             = 0.5 # [m] standard deviation of position randomization
         self.RANDOMIZATION_ANGLE              = np.pi/2 # [rad] standard deviation of angular randomization
         self.RANDOMIZATION_TARGET_VELOCITY    = 0.0 # [m/s] standard deviation of the target's velocity randomization
         self.RANDOMIZATION_TARGET_OMEGA       = 0.0 # [rad/s] standard deviation of the target's angular velocity randomization
@@ -103,22 +103,24 @@ class Environment:
         self.SKIP_FAILED_ANIMATIONS           = True # Error the program or skip when animations fail?
 
         # Physical properties
-        self.LENGTH                = 0.3  # [m] side length
-        self.MASS                  = 10.0   # [kg] for chaser
-        self.INERTIA               = 1/12*self.MASS*(self.LENGTH**2 + self.LENGTH**2) # 0.15 [kg m^2]
-        self.DOCKING_PORT_POSITION = np.array([0, self.LENGTH/2]) # position of the docking cone on the target in its body frame
-        self.ARM_MOUNT_POSITION    = np.array([0, self.LENGTH/2]) # [m] position of the arm mounting point on the chaser in the body frame
-        self.SHOULDER_POSITION     = self.ARM_MOUNT_POSITION + [0, 0.05] # [m] position of the arm's shoulder in the chaser body frame
-        self.ELBOW_POSITION        = self.SHOULDER_POSITION + [0.3*np.sin(np.pi/6), 0.3*np.cos(np.pi/6)] # [m] position of the arm's elbow in the chaser body frame
-        self.WRIST_POSITION        = self.ELBOW_POSITION + [0.3*np.sin(np.pi/4),-0.3*np.cos(np.pi/4)] # [m] position of the arm's wrist in the chaser body frame
-        self.END_EFFECTOR_POSITION = self.WRIST_POSITION + [0.1, 0] # po sition of the optimally-deployed end-effector on the chaser in the body frame
+        self.LENGTH                        = 0.3  # [m] side length
+        self.MASS                          = 10.0   # [kg] for chaser
+        self.INERTIA                       = 1/12*self.MASS*(self.LENGTH**2 + self.LENGTH**2) # 0.15 [kg m^2]
+        self.DOCKING_PORT_MOUNT_POSITION   = np.array([0, self.LENGTH/2]) # position of the docking cone on the target in its body frame
+        self.DOCKING_PORT_CORNER1_POSITION = self.DOCKING_PORT_MOUNT_POSITION + [ 0.05, 0.1] # position of the docking cone on the target in its body frame
+        self.DOCKING_PORT_CORNER2_POSITION = self.DOCKING_PORT_MOUNT_POSITION + [-0.05, 0.1] # position of the docking cone on the target in its body frame
+        self.ARM_MOUNT_POSITION            = np.array([0, self.LENGTH/2]) # [m] position of the arm mounting point on the chaser in the body frame
+        self.SHOULDER_POSITION             = self.ARM_MOUNT_POSITION + [0, 0.05] # [m] position of the arm's shoulder in the chaser body frame
+        self.ELBOW_POSITION                = self.SHOULDER_POSITION + [0.3*np.sin(np.pi/6), 0.3*np.cos(np.pi/6)] # [m] position of the arm's elbow in the chaser body frame
+        self.WRIST_POSITION                = self.ELBOW_POSITION + [0.3*np.sin(np.pi/4),-0.3*np.cos(np.pi/4)] # [m] position of the arm's wrist in the chaser body frame
+        self.END_EFFECTOR_POSITION         = self.WRIST_POSITION + [0.1, 0] # po sition of the optimally-deployed end-effector on the chaser in the body frame
         
         # Reward function properties
         self.DOCKING_REWARD              = 100 # A lump-sum given to the chaser when it docks
-        self.SUCCESSFUL_DOCKING_DISTANCE = 0.01 # [m] distance at which the magnetic docking can occur
-        self.DOCKING_ANGLE_PENALTY       = 1 # A penalty given to the chaser, upon docking, for having an angle when docking
-        self.DOCKING_VELOCITY_PENALTY    = 1 # A penalty given to the chaser, upon docking, for having residual velocity and therefore bumping the target
-        self.TARGET_COLLISION_PENALTY    = 15           # [rewards/second] penalty given for colliding with target  
+        self.SUCCESSFUL_DOCKING_DISTANCE = 0.05 # [m] distance at which the magnetic docking can occur
+        self.MAX_DOCKING_ANGLE_PENALTY   = 50 # A penalty given to the chaser, upon docking, for having an angle when docking. The penalty is 0 upon perfect docking and MAX_DOCKING_ANGLE_PENALTY upon perfectly bad docking
+        self.DOCKING_VELOCITY_PENALTY    = 50 # A penalty given to the chaser, upon docking, for having every 1 m/s collision velocity upon docking
+        self.TARGET_COLLISION_PENALTY    = 15 # [rewards/second] penalty given for colliding with target  
         self.TARGET_COLLISION_DISTANCE   = np.sqrt(2)*self.LENGTH # [m] how close chaser and target need to be before a penalty is applied
         self.END_ON_FALL                 = False # end episode on a fall off the table        
         self.FALL_OFF_TABLE_PENALTY      = 100.
@@ -211,7 +213,7 @@ class Environment:
         
         # Position in Inertial = Body position (inertial) + C_Ib * EE position in body
         self.end_effector_position = self.chaser_position[:-1] + np.matmul(C_Ib_chaser, self.END_EFFECTOR_POSITION)
-        self.docking_port_position = self.target_position[:-1] + np.matmul(C_Ib_target, self.DOCKING_PORT_POSITION)
+        self.docking_port_position = self.target_position[:-1] + np.matmul(C_Ib_target, self.DOCKING_PORT_MOUNT_POSITION)
         
         
     #####################################
@@ -334,16 +336,45 @@ class Environment:
         
         # Give a large reward for docking
         if np.linalg.norm(self.end_effector_position - self.docking_port_position) <= self.SUCCESSFUL_DOCKING_DISTANCE:
+            
+            
+            
             reward += self.DOCKING_REWARD
             
             # Penalize for end-effector angle
-            #TODO: docking penalties
+            # end-effector angle in the chaser body frame
+            end_effector_angle_body = np.arctan2(self.END_EFFECTOR_POSITION[1] - self.WRIST_POSITION[1],self.END_EFFECTOR_POSITION[0] - self.WRIST_POSITION[0])
+            end_effector_angle_inertial = end_effector_angle_body + self.chaser_position[-1]
             
+            # Docking cone angle in the target body frame
+            docking_cone_angle_body = np.arctan2(self.DOCKING_PORT_CORNER1_POSITION[1] - self.DOCKING_PORT_CORNER2_POSITION[1], self.DOCKING_PORT_CORNER1_POSITION[0] - self.DOCKING_PORT_CORNER2_POSITION[0])
+            docking_cone_angle_inertial = docking_cone_angle_body + self.target_position[-1] - np.pi/2 # additional -pi/2 since we must dock perpendicular into the cone
+            
+            # Calculate the docking angle error
+            docking_angle_error = (docking_cone_angle_inertial - end_effector_angle_inertial + np.pi) % (2*np.pi) - np.pi # wrapping to [-pi, pi] 
+            
+            # Penalize for any non-zero angle
+            reward -= np.sin(docking_angle_error/2) * self.MAX_DOCKING_ANGLE_PENALTY
+                        
             # Penalize for relative velocity during docking
-            #TODO: docking penalties
+            # Calculating the end-effector velocity; v_e = v_0 + omega x r_e/0
+            end_effector_velocity = self.chaser_velocity[:-1] + self.chaser_velocity[-1] * np.matmul(self.make_C_bI(self.chaser_position[-1]).T,[-self.END_EFFECTOR_POSITION[1], self.END_EFFECTOR_POSITION[0]])
+            
+            # Calculating the docking cone velocity
+            docking_cone_velocity = self.target_velocity[:-1] + self.target_velocity[-1] * np.matmul(self.make_C_bI(self.target_position[-1]).T,[-self.DOCKING_PORT_MOUNT_POSITION[1], self.DOCKING_PORT_MOUNT_POSITION[0]])
+            
+            # Calculating the docking velocity error
+            docking_relative_velocity = end_effector_velocity - docking_cone_velocity
+            
+            # Applying the penalty
+            reward -= np.linalg.norm(docking_relative_velocity) * self.DOCKING_VELOCITY_PENALTY # 
+            
+            print("docking successful! Reward given: ", reward, " distance: ", np.linalg.norm(self.end_effector_position - self.docking_port_position), " relative velocity: ", np.linalg.norm(docking_relative_velocity))
         
         # Giving a penalty for colliding with the target
         if np.linalg.norm(self.chaser_position[:-1] - self.target_position[:-1]) <= self.TARGET_COLLISION_DISTANCE:
+            
+            print("Colliding with target! Distance: ", np.linalg.norm(self.chaser_position[:-1] - self.target_position[:-1]))
             reward -= self.TARGET_COLLISION_PENALTY
 
         # Multiplying the reward by the TIMESTEP to give the rewards on a per-second basis
@@ -517,7 +548,9 @@ def render(states, actions, instantaneous_reward_log, cumulative_reward_log, cri
 
     # Extracting physical properties
     LENGTH = temp_env.LENGTH
-    DOCKING_PORT_POSITION = temp_env.DOCKING_PORT_POSITION
+    DOCKING_PORT_MOUNT_POSITION = temp_env.DOCKING_PORT_MOUNT_POSITION
+    DOCKING_PORT_CORNER1_POSITION = temp_env.DOCKING_PORT_CORNER1_POSITION
+    DOCKING_PORT_CORNER2_POSITION = temp_env.DOCKING_PORT_CORNER2_POSITION
     ARM_MOUNT_POSITION = temp_env.ARM_MOUNT_POSITION
     SHOULDER_POSITION = temp_env.SHOULDER_POSITION
     ELBOW_POSITION = temp_env.ELBOW_POSITION
@@ -558,10 +591,10 @@ def render(states, actions, instantaneous_reward_log, cumulative_reward_log, cri
                                    [-LENGTH/2,-LENGTH/2],
                                    [-LENGTH/2, LENGTH/2],
                                    [ LENGTH/2, LENGTH/2],
-                                   [DOCKING_PORT_POSITION[0],DOCKING_PORT_POSITION[1]],
-                                   [DOCKING_PORT_POSITION[0]+0.05,DOCKING_PORT_POSITION[1]+0.1],
-                                   [DOCKING_PORT_POSITION[0]-0.05,DOCKING_PORT_POSITION[1]+0.1],
-                                   [DOCKING_PORT_POSITION[0],DOCKING_PORT_POSITION[1]]]).T
+                                   [DOCKING_PORT_MOUNT_POSITION[0],DOCKING_PORT_MOUNT_POSITION[1]],
+                                   [DOCKING_PORT_CORNER1_POSITION[0],DOCKING_PORT_CORNER1_POSITION[1]],
+                                   [DOCKING_PORT_CORNER2_POSITION[0],DOCKING_PORT_CORNER2_POSITION[1]],
+                                   [DOCKING_PORT_MOUNT_POSITION[0],DOCKING_PORT_MOUNT_POSITION[1]]]).T
     
     # The front-face points on the target
     target_front_face_body = np.array([[[ LENGTH/2],[ LENGTH/2]],
@@ -726,7 +759,7 @@ def render(states, actions, instantaneous_reward_log, cumulative_reward_log, cri
             # Move animation to the proper directory
             os.rename(filename + '_episode_' + str(episode_number) + '.mp4', save_directory + filename + '/videos/episode_' + str(episode_number) + '.mp4')
         except:
-            print("Skipping animation for episode %i due to an error" %episode_number)
+            ("Skipping animation for episode %i due to an error" %episode_number)
             # Try to delete the partially completed video file
             try:
                 os.remove(filename + '_episode_' + str(episode_number) + '.mp4')

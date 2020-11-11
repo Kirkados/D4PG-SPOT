@@ -86,7 +86,7 @@ class Environment:
         self.INITIAL_TARGET_POSITION          = np.array([2.0, 1.0, 0.0]) # [m, m, rad]
         self.INITIAL_TARGET_VELOCITY          = np.array([0.0, 0.0, 0.0]) # [m/s, m/s, rad/s]
         self.NORMALIZE_STATE                  = True # Normalize state on each timestep to avoid vanishing gradients
-        self.RANDOMIZE                        = True # whether or not to RANDOMIZE the state & target location
+        self.RANDOMIZE                        = False # whether or not to RANDOMIZE the state & target location
         self.RANDOMIZATION_LENGTH             = 0.5 # [m] standard deviation of position randomization
         self.RANDOMIZATION_ANGLE              = np.pi/2 # [rad] standard deviation of angular randomization
         self.RANDOMIZATION_TARGET_VELOCITY    = 0.0 # [m/s] standard deviation of the target's velocity randomization
@@ -122,7 +122,7 @@ class Environment:
         self.DOCKING_VELOCITY_PENALTY    = 50 # A penalty given to the chaser, upon docking, for having every 1 m/s collision velocity upon docking
         self.TARGET_COLLISION_PENALTY    = 15 # [rewards/second] penalty given for colliding with target  
         self.TARGET_COLLISION_DISTANCE   = np.sqrt(2)*self.LENGTH # [m] how close chaser and target need to be before a penalty is applied
-        self.END_ON_FALL                 = False # end episode on a fall off the table        
+        self.END_ON_FALL                 = True # end episode on a fall off the table        
         self.FALL_OFF_TABLE_PENALTY      = 100.
         
         # Test time properties
@@ -369,13 +369,18 @@ class Environment:
             # Applying the penalty
             reward -= np.linalg.norm(docking_relative_velocity) * self.DOCKING_VELOCITY_PENALTY # 
             
-            print("docking successful! Reward given: ", reward, " distance: ", np.linalg.norm(self.end_effector_position - self.docking_port_position), " relative velocity: ", np.linalg.norm(docking_relative_velocity))
+            if self.test_time:
+                print("docking successful! Reward given: ", reward, " distance: ", np.linalg.norm(self.end_effector_position - self.docking_port_position), " relative velocity: ", np.linalg.norm(docking_relative_velocity))
         
         # Giving a penalty for colliding with the target
         if np.linalg.norm(self.chaser_position[:-1] - self.target_position[:-1]) <= self.TARGET_COLLISION_DISTANCE:
-            
-            print("Colliding with target! Distance: ", np.linalg.norm(self.chaser_position[:-1] - self.target_position[:-1]))
+            if self.test_time:
+                print("Colliding with target! Distance: ", np.linalg.norm(self.chaser_position[:-1] - self.target_position[:-1]))
             reward -= self.TARGET_COLLISION_PENALTY
+        
+        # If we've fallen off the table, penalize this behaviour
+        if self.chaser_position[0] > 4 or self.chaser_position[0] < -1 or self.chaser_position[1] > 3 or self.chaser_position[1] < -1 or self.chaser_position[2] > 6*np.pi or self.chaser_position[2] < -6*np.pi:
+            reward -= self.FALL_OFF_TABLE_PENALTY
 
         # Multiplying the reward by the TIMESTEP to give the rewards on a per-second basis
         return reward*self.TIMESTEP # possibly add .squeeze() if the shape is not ()
@@ -395,7 +400,8 @@ class Environment:
 
         # If we've fallen off the table, end the episode
         if self.chaser_position[0] > 4 or self.chaser_position[0] < -1 or self.chaser_position[1] > 3 or self.chaser_position[1] < -1 or self.chaser_position[2] > 6*np.pi or self.chaser_position[2] < -6*np.pi:
-            print("Fell off table!")
+            if self.test_time:
+                print("Fell off table!")
             return True
 
         # If we've run out of timesteps
@@ -411,7 +417,7 @@ class Environment:
         self.env_to_agent = multiprocessing.Queue(maxsize = 1)
 
         return self.agent_to_env, self.env_to_agent
-    
+
     
     def make_C_bI(self, angle):
         
@@ -476,10 +482,14 @@ class Environment:
                 self.env_to_agent.put(np.concatenate([self.relative_pose_body_frame(), self.chaser_position, self.target_position, self.chaser_velocity, self.target_velocity]))
 
             else:
+                
                 # Delay the action by DYNAMICS_DELAY timesteps. The environment accumulates the action delay--the agent still thinks the sent action was used.
                 if self.DYNAMICS_DELAY > 0:
                     self.action_delay_queue.put(action,False) # puts the current action to the bottom of the stack
                     action = self.action_delay_queue.get(False) # grabs the delayed action and treats it as truth.   
+                
+                # Rotating the action from the body frame into the inertial frame
+                action[:-1] = np.matmul(self.make_C_bI(self.chaser_position[-1]).T, action[:-1])
 
                 ################################
                 ##### Step the environment #####

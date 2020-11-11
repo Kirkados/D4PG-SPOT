@@ -15,7 +15,7 @@ class Settings:
     ##### Run Settings #####
     ########################
 
-    RUN_NAME               = 'reward_function_complete' # use just the name. If trying to restore from file, use name along with timestamp
+    RUN_NAME               = 'table_fall' # use just the name. If trying to restore from file, use name along with timestamp
     ENVIRONMENT            = 'SPOT'
     AGENT                  = ''
     RECORD_VIDEO           = True

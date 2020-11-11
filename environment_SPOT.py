@@ -354,7 +354,7 @@ class Environment:
             docking_angle_error = (docking_cone_angle_inertial - end_effector_angle_inertial + np.pi) % (2*np.pi) - np.pi # wrapping to [-pi, pi] 
             
             # Penalize for any non-zero angle
-            reward -= np.sin(docking_angle_error/2) * self.MAX_DOCKING_ANGLE_PENALTY
+            reward -= np.abs(np.sin(docking_angle_error/2)) * self.MAX_DOCKING_ANGLE_PENALTY
                         
             # Penalize for relative velocity during docking
             # Calculating the end-effector velocity; v_e = v_0 + omega x r_e/0
@@ -391,15 +391,16 @@ class Environment:
         
         # If we've docked with the target
         if np.linalg.norm(self.end_effector_position - self.docking_port_position) <= self.SUCCESSFUL_DOCKING_DISTANCE:
-            done = True
+            return True
 
         # If we've fallen off the table, end the episode
-        if self.chaser_position[0] > self.UPPER_STATE_BOUND[0] or self.chaser_position[0] < self.LOWER_STATE_BOUND[0] or self.chaser_position[1] > self.UPPER_STATE_BOUND[1] or self.chaser_position[1] < self.LOWER_STATE_BOUND[1] or self.chaser_position[2] > self.UPPER_STATE_BOUND[2] or self.chaser_position[2] < self.LOWER_STATE_BOUND[2]:
-            done = self.END_ON_FALL
+        if self.chaser_position[0] > 4 or self.chaser_position[0] < -1 or self.chaser_position[1] > 3 or self.chaser_position[1] < -1 or self.chaser_position[2] > 6*np.pi or self.chaser_position[2] < -6*np.pi:
+            print("Fell off table!")
+            return True
 
         # If we've run out of timesteps
         if round(self.time/self.TIMESTEP) == self.MAX_NUMBER_OF_TIMESTEPS:
-            done = True
+            return True
 
         return done
 

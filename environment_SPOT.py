@@ -208,13 +208,13 @@ class Environment:
         # Updates the position of the end-effector and the docking port in the Inertial frame
         
         # Make rotation matrices        
-        C_Ib_chaser = self.make_C_bI(self.chaser_position[-1])
-        C_Ib_target = self.make_C_bI(self.target_position[-1])
+        C_Ib_chaser = self.make_C_bI(self.chaser_position[-1]).T
+        C_Ib_target = self.make_C_bI(self.target_position[-1]).T
         
         # Position in Inertial = Body position (inertial) + C_Ib * EE position in body
         self.end_effector_position = self.chaser_position[:-1] + np.matmul(C_Ib_chaser, self.END_EFFECTOR_POSITION)
         self.docking_port_position = self.target_position[:-1] + np.matmul(C_Ib_target, self.DOCKING_PORT_MOUNT_POSITION)
-        
+
         
     #####################################
     ##### Step the Dynamics forward #####

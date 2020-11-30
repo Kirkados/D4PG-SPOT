@@ -59,6 +59,8 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import matplotlib.gridspec as gridspec
 
+from shapely.geometry import Point, Polygon # for collision detection
+
 class Environment:
 
     def __init__(self):
@@ -116,14 +118,18 @@ class Environment:
         self.END_EFFECTOR_POSITION         = self.WRIST_POSITION + [0.1, 0] # po sition of the optimally-deployed end-effector on the chaser in the body frame
         
         # Reward function properties
-        self.DOCKING_REWARD              = 100 # A lump-sum given to the chaser when it docks
-        self.SUCCESSFUL_DOCKING_DISTANCE = 0.05 # [m] distance at which the magnetic docking can occur
-        self.MAX_DOCKING_ANGLE_PENALTY   = 50 # A penalty given to the chaser, upon docking, for having an angle when docking. The penalty is 0 upon perfect docking and MAX_DOCKING_ANGLE_PENALTY upon perfectly bad docking
-        self.DOCKING_VELOCITY_PENALTY    = 50 # A penalty given to the chaser, upon docking, for having every 1 m/s collision velocity upon docking
-        self.TARGET_COLLISION_PENALTY    = 15 # [rewards/second] penalty given for colliding with target  
-        self.TARGET_COLLISION_DISTANCE   = np.sqrt(2)*self.LENGTH # [m] how close chaser and target need to be before a penalty is applied
-        self.END_ON_FALL                 = True # end episode on a fall off the table        
-        self.FALL_OFF_TABLE_PENALTY      = 100.
+        self.DOCKING_REWARD                   = 100 # A lump-sum given to the chaser when it docks
+        self.SUCCESSFUL_DOCKING_DISTANCE      = 0.03 # [m] distance at which the magnetic docking can occur
+        self.MAX_DOCKING_ANGLE_PENALTY        = 25 # A penalty given to the chaser, upon docking, for having an angle when docking. The penalty is 0 upon perfect docking and MAX_DOCKING_ANGLE_PENALTY upon perfectly bad docking
+        self.DOCKING_EE_VELOCITY_PENALTY      = 25 # A penalty given to the chaser, upon docking, for every 1 m/s end-effector collision velocity upon docking
+        self.DOCKING_ANGULAR_VELOCITY_PENALTY = 25 # A penalty given to the chaser, upon docking, for every 1 rad/s angular body velocity upon docking
+        self.END_ON_FALL                      = True # end episode on a fall off the table        
+        self.FALL_OFF_TABLE_PENALTY           = 100.
+        self.CHECK_CHASER_TARGET_COLLISION    = True
+        self.TARGET_COLLISION_PENALTY         = 2 # [rewards/timestep] penalty given for colliding with target  
+        self.CHECK_END_EFFECTOR_COLLISION     = True # Whether to do collision detection on the end-effector
+        self.CHECK_END_EFFECTOR_FORBIDDEN     = True # Whether to expand the collision area to include the forbidden zone
+        self.END_EFFECTOR_COLLISION_PENALTY   = 2 # [rewards/timestep] Penalty for end-effector collisions (with target or optionally with the forbidden zone)
         
         # Test time properties
         self.TEST_ON_DYNAMICS            = True # Whether or not to use full dynamics along with a PD controller at test time
@@ -186,6 +192,9 @@ class Environment:
         
         # Update docking component locations
         self.update_docking_locations()
+        
+        # Check for collisions
+        self.check_collisions()
 
         # Initializing the previous velocity and control effort for the integral-acceleration controller
         self.previous_velocity = np.zeros(len(self.INITIAL_CHASER_VELOCITY))
@@ -274,6 +283,9 @@ class Environment:
         # Update docking locations
         self.update_docking_locations()
         
+        # Check for collisions
+        self.check_collisions()
+        
         # Increment the timestep
         self.time += self.TIMESTEP
 
@@ -337,8 +349,6 @@ class Environment:
         # Give a large reward for docking
         if np.linalg.norm(self.end_effector_position - self.docking_port_position) <= self.SUCCESSFUL_DOCKING_DISTANCE:
             
-            
-            
             reward += self.DOCKING_REWARD
             
             # Penalize for end-effector angle
@@ -367,23 +377,103 @@ class Environment:
             docking_relative_velocity = end_effector_velocity - docking_cone_velocity
             
             # Applying the penalty
-            reward -= np.linalg.norm(docking_relative_velocity) * self.DOCKING_VELOCITY_PENALTY # 
+            reward -= np.linalg.norm(docking_relative_velocity) * self.DOCKING_EE_VELOCITY_PENALTY # 
+            
+            # Penalize for chaser angular velocity upon docking
+            reward -= np.abs(self.chaser_velocity[-1] - self.target_velocity[-1]) * self.DOCKING_ANGULAR_VELOCITY_PENALTY
             
             if self.test_time:
-                print("docking successful! Reward given: ", reward, " distance: ", np.linalg.norm(self.end_effector_position - self.docking_port_position), " relative velocity: ", np.linalg.norm(docking_relative_velocity))
+                print("docking successful! Reward given: %.1f distance: %.3f relative velocity: %.3f velocity penalty: %.1f docking angle: %.2f angle penalty: %.1f angular rate error: %.3f angular rate penalty %.1f" %(reward, np.linalg.norm(self.end_effector_position - self.docking_port_position), np.linalg.norm(docking_relative_velocity), np.linalg.norm(docking_relative_velocity) * self.DOCKING_EE_VELOCITY_PENALTY, docking_angle_error*180/np.pi, np.abs(np.sin(docking_angle_error/2)) * self.MAX_DOCKING_ANGLE_PENALTY,np.abs(self.chaser_velocity[-1] - self.target_velocity[-1]),np.abs(self.chaser_velocity[-1] - self.target_velocity[-1]) * self.DOCKING_ANGULAR_VELOCITY_PENALTY))
+        
         
         # Giving a penalty for colliding with the target
-        if np.linalg.norm(self.chaser_position[:-1] - self.target_position[:-1]) <= self.TARGET_COLLISION_DISTANCE:
-            if self.test_time:
-                print("Colliding with target! Distance: ", np.linalg.norm(self.chaser_position[:-1] - self.target_position[:-1]))
+        if self.chaser_target_collision:
             reward -= self.TARGET_COLLISION_PENALTY
+        
+        if self.end_effector_collision:
+            reward -= self.END_EFFECTOR_COLLISION_PENALTY
+        
+        if self.forbidden_area_collision:
+            reward -= self.END_EFFECTOR_COLLISION_PENALTY
         
         # If we've fallen off the table, penalize this behaviour
         if self.chaser_position[0] > 4 or self.chaser_position[0] < -1 or self.chaser_position[1] > 3 or self.chaser_position[1] < -1 or self.chaser_position[2] > 6*np.pi or self.chaser_position[2] < -6*np.pi:
             reward -= self.FALL_OFF_TABLE_PENALTY
 
-        # Multiplying the reward by the TIMESTEP to give the rewards on a per-second basis
-        return reward*self.TIMESTEP # possibly add .squeeze() if the shape is not ()
+        return reward # possibly add .squeeze() if the shape is not ()
+    
+    def check_collisions(self):
+        """ Calculate whether the different objects are colliding with the target. 
+        
+            Returns 3 booleans: end_effector_collision, forbidden_area_collision, chaser_target_collision
+        """
+        
+        ##################################################
+        ### Calculating Polygons in the inertial frame ###
+        ##################################################
+        
+        # Target    
+        target_points_body = np.array([[ self.LENGTH/2,-self.LENGTH/2],
+                                       [-self.LENGTH/2,-self.LENGTH/2],
+                                       [-self.LENGTH/2, self.LENGTH/2],
+                                       [ self.LENGTH/2, self.LENGTH/2]]).T    
+        # Rotation matrix (body -> inertial)
+        C_Ib_target = self.make_C_bI(self.target_position[-1]).T        
+        # Rotating body frame coordinates to inertial frame
+        target_body_inertial = np.matmul(C_Ib_target, target_points_body) + np.array([self.target_position[0], self.target_position[1]]).reshape([2,-1])
+        target_polygon = Polygon(target_body_inertial.T)
+        
+        # Forbidden Area
+        forbidden_area_body = np.array([[self.LENGTH/2, self.LENGTH/2],   
+                                        [self.DOCKING_PORT_CORNER1_POSITION[0],self.DOCKING_PORT_CORNER1_POSITION[1]],
+                                        [self.DOCKING_PORT_MOUNT_POSITION[0],self.DOCKING_PORT_MOUNT_POSITION[1]],
+                                        [self.DOCKING_PORT_CORNER2_POSITION[0],self.DOCKING_PORT_CORNER2_POSITION[1]],
+                                        [-self.LENGTH/2,self.LENGTH/2],
+                                        [self.LENGTH/2, self.LENGTH/2]]).T        
+        # Rotating body frame coordinates to inertial frame
+        forbidden_area_inertial = np.matmul(C_Ib_target, forbidden_area_body) + np.array([self.target_position[0], self.target_position[1]]).reshape([2,-1])         
+        forbidden_polygon = Polygon(forbidden_area_inertial.T)
+        
+        # End-effector
+        end_effector_point = Point(self.end_effector_position)
+        
+        # Chaser
+        chaser_points_body = np.array([[ self.LENGTH/2,-self.LENGTH/2],
+                                       [-self.LENGTH/2,-self.LENGTH/2],
+                                       [-self.LENGTH/2, self.LENGTH/2],
+                                       [ self.LENGTH/2, self.LENGTH/2]]).T    
+        # Rotation matrix (body -> inertial)
+        C_Ib_chaser = self.make_C_bI(self.chaser_position[-1]).T        
+        # Rotating body frame coordinates to inertial frame
+        chaser_body_inertial = np.matmul(C_Ib_chaser, chaser_points_body) + np.array([self.chaser_position[0], self.chaser_position[1]]).reshape([2,-1])
+        chaser_polygon = Polygon(chaser_body_inertial.T)
+        
+        
+        ###########################
+        ### Checking collisions ###
+        ###########################
+        self.end_effector_collision = False
+        self.forbidden_area_collision = False
+        self.chaser_target_collision = False
+        
+        if self.CHECK_END_EFFECTOR_COLLISION and end_effector_point.within(target_polygon):
+            if self.test_time:
+                print("End-effector colliding with the target!")
+            self.end_effector_collision = True
+        
+        if self.CHECK_END_EFFECTOR_FORBIDDEN and end_effector_point.within(forbidden_polygon):
+            if self.test_time:
+                print("End-effector within the forbidden area!")
+            self.forbidden_area_collision = True
+        
+        if self.CHECK_CHASER_TARGET_COLLISION and chaser_polygon.intersects(target_polygon):
+            if self.test_time:
+                print("Chaser/target collision")
+            self.chaser_target_collision = True
+            
+        if not np.any([self.end_effector_collision, self.forbidden_area_collision, self.chaser_target_collision]):
+            pass
+            #print("No collisions")                                                            
 
 
     def is_done(self):
@@ -490,6 +580,7 @@ class Environment:
                 
                 # Rotating the action from the body frame into the inertial frame
                 action[:-1] = np.matmul(self.make_C_bI(self.chaser_position[-1]).T, action[:-1])
+            
 
                 ################################
                 ##### Step the environment #####

@@ -15,7 +15,7 @@ class Settings:
     ##### Run Settings #####
     ########################
 
-    RUN_NAME               = 'rotation_matrix' # use just the name. If trying to restore from file, use name along with timestamp
+    RUN_NAME               = 'collision_detection' # use just the name. If trying to restore from file, use name along with timestamp
     ENVIRONMENT            = 'SPOT'
     AGENT                  = ''
     RECORD_VIDEO           = True
@@ -68,7 +68,7 @@ class Settings:
         NOISE_SCALE           = 1 # 1 is best for uniform -> noise scaled to the action range
     else:
         NOISE_SCALE           = 1/3 # standard deviation = 1/3 the action range. Therefore a 3-sigma action will cause full exploration in the worst case scenario
-    NOISE_SCALE_DECAY         =0.999986137152479 # 0.999986137152479 for 50k half-life # 0.9999 for 7k half-life # 1 means the noise does not decay during training
+    NOISE_SCALE_DECAY         =0.9999986137152479 # 0.999986137152479 for 50k half-life # 0.9999 for 7k half-life # 1 means the noise does not decay during training
 
 #%%
     ####################################

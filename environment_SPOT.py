@@ -94,7 +94,7 @@ class Environment:
         self.RANDOMIZATION_TARGET_VELOCITY    = 0.0 # [m/s] standard deviation of the target's velocity randomization
         self.RANDOMIZATION_TARGET_OMEGA       = 0.0 # [rad/s] standard deviation of the target's angular velocity randomization
         self.MIN_V                            = -100.
-        self.MAX_V                            =  100.
+        self.MAX_V                            =  125.
         self.N_STEP_RETURN                    =   5
         self.DISCOUNT_FACTOR                  =   0.95**(1/self.N_STEP_RETURN)
         self.TIMESTEP                         =   0.2 # [s]
@@ -119,7 +119,7 @@ class Environment:
         
         # Reward function properties
         self.DOCKING_REWARD                   = 100 # A lump-sum given to the chaser when it docks
-        self.SUCCESSFUL_DOCKING_DISTANCE      = 0.03 # [m] distance at which the magnetic docking can occur
+        self.SUCCESSFUL_DOCKING_RADIUS        = 0.04 # [m] distance at which the magnetic docking can occur
         self.MAX_DOCKING_ANGLE_PENALTY        = 25 # A penalty given to the chaser, upon docking, for having an angle when docking. The penalty is 0 upon perfect docking and MAX_DOCKING_ANGLE_PENALTY upon perfectly bad docking
         self.DOCKING_EE_VELOCITY_PENALTY      = 25 # A penalty given to the chaser, upon docking, for every 1 m/s end-effector collision velocity upon docking
         self.DOCKING_ANGULAR_VELOCITY_PENALTY = 25 # A penalty given to the chaser, upon docking, for every 1 rad/s angular body velocity upon docking
@@ -130,6 +130,9 @@ class Environment:
         self.CHECK_END_EFFECTOR_COLLISION     = True # Whether to do collision detection on the end-effector
         self.CHECK_END_EFFECTOR_FORBIDDEN     = True # Whether to expand the collision area to include the forbidden zone
         self.END_EFFECTOR_COLLISION_PENALTY   = 2 # [rewards/timestep] Penalty for end-effector collisions (with target or optionally with the forbidden zone)
+        self.GIVE_MID_WAY_REWARD              = True # Whether or not to give a reward mid-way towards the docking port to encourage the learning to move in the proper direction
+        self.MID_WAY_REWARD_RADIUS            = 0.3 # [ms] the radius from the DOCKING_PORT_MOUNT_POSITION that the mid-way reward is given
+        self.MID_WAY_REWARD                   = 25 # The value of the mid-way reward
         
         # Test time properties
         self.TEST_ON_DYNAMICS            = True # Whether or not to use full dynamics along with a PD controller at test time
@@ -166,8 +169,12 @@ class Environment:
         # Setting the default to be kinematics
         self.dynamics_flag = False
 
+        # Resetting the mid-way flag
+        self.not_yet_mid_way = True
+
         # Logging whether it is test time for this episode
         self.test_time = test_time
+        
 
         # If we are randomizing the initial conditions and state
         if self.RANDOMIZE:
@@ -205,7 +212,7 @@ class Environment:
 
         # Resetting the time
         self.time = 0.
-
+                
         # Resetting the action delay queue
         if self.DYNAMICS_DELAY > 0:
             self.action_delay_queue = queue.Queue(maxsize = self.DYNAMICS_DELAY + 1)
@@ -347,7 +354,7 @@ class Environment:
         reward = 0
         
         # Give a large reward for docking
-        if np.linalg.norm(self.end_effector_position - self.docking_port_position) <= self.SUCCESSFUL_DOCKING_DISTANCE:
+        if self.docked:
             
             reward += self.DOCKING_REWARD
             
@@ -383,8 +390,14 @@ class Environment:
             reward -= np.abs(self.chaser_velocity[-1] - self.target_velocity[-1]) * self.DOCKING_ANGULAR_VELOCITY_PENALTY
             
             if self.test_time:
-                print("docking successful! Reward given: %.1f distance: %.3f relative velocity: %.3f velocity penalty: %.1f docking angle: %.2f angle penalty: %.1f angular rate error: %.3f angular rate penalty %.1f" %(reward, np.linalg.norm(self.end_effector_position - self.docking_port_position), np.linalg.norm(docking_relative_velocity), np.linalg.norm(docking_relative_velocity) * self.DOCKING_EE_VELOCITY_PENALTY, docking_angle_error*180/np.pi, np.abs(np.sin(docking_angle_error/2)) * self.MAX_DOCKING_ANGLE_PENALTY,np.abs(self.chaser_velocity[-1] - self.target_velocity[-1]),np.abs(self.chaser_velocity[-1] - self.target_velocity[-1]) * self.DOCKING_ANGULAR_VELOCITY_PENALTY))
+                print("docking successful! Reward given: %.1f distance: %.3f; relative velocity: %.3f velocity penalty: %.1f; docking angle: %.2f angle penalty: %.1f; angular rate error: %.3f angular rate penalty %.1f" %(reward, np.linalg.norm(self.end_effector_position - self.docking_port_position), np.linalg.norm(docking_relative_velocity), np.linalg.norm(docking_relative_velocity) * self.DOCKING_EE_VELOCITY_PENALTY, docking_angle_error*180/np.pi, np.abs(np.sin(docking_angle_error/2)) * self.MAX_DOCKING_ANGLE_PENALTY,np.abs(self.chaser_velocity[-1] - self.target_velocity[-1]),np.abs(self.chaser_velocity[-1] - self.target_velocity[-1]) * self.DOCKING_ANGULAR_VELOCITY_PENALTY))
         
+        if self.GIVE_MID_WAY_REWARD and self.not_yet_mid_way and self.mid_way:
+            if self.test_time:
+                print("Just passed the mid-way mark. Distance: %.3f at time %.1f" %(np.linalg.norm(self.end_effector_position - self.docking_port_position), self.time))
+                self.not_yet_mid_way = False
+            reward += self.MID_WAY_REWARD
+            #Debug why this gets printed 4 times sometimes at the end of the episode!
         
         # Giving a penalty for colliding with the target
         if self.chaser_target_collision:
@@ -448,6 +461,11 @@ class Environment:
         chaser_body_inertial = np.matmul(C_Ib_chaser, chaser_points_body) + np.array([self.chaser_position[0], self.chaser_position[1]]).reshape([2,-1])
         chaser_polygon = Polygon(chaser_body_inertial.T)
         
+        # Docking Polygon (circle)
+        docking_circle = Point(self.target_position[:-1] + np.matmul(C_Ib_target, self.DOCKING_PORT_MOUNT_POSITION)).buffer(self.SUCCESSFUL_DOCKING_RADIUS)
+        
+        # Mid-way Polygon (circle)
+        mid_way_circle = Point(self.target_position[:-1] + np.matmul(C_Ib_target, self.DOCKING_PORT_MOUNT_POSITION)).buffer(self.MID_WAY_REWARD_RADIUS)
         
         ###########################
         ### Checking collisions ###
@@ -455,6 +473,8 @@ class Environment:
         self.end_effector_collision = False
         self.forbidden_area_collision = False
         self.chaser_target_collision = False
+        self.docked = False
+        self.mid_way = False
         
         if self.CHECK_END_EFFECTOR_COLLISION and end_effector_point.within(target_polygon):
             if self.test_time:
@@ -470,6 +490,16 @@ class Environment:
             if self.test_time:
                 print("Chaser/target collision")
             self.chaser_target_collision = True
+        
+        if self.GIVE_MID_WAY_REWARD and self.not_yet_mid_way and end_effector_point.within(mid_way_circle):
+            if self.test_time:
+                print("Mid Way!")
+            self.mid_way = True
+        
+        if end_effector_point.within(docking_circle):
+            if self.test_time:
+                print("Docked!")
+            self.docked = True
             
         if not np.any([self.end_effector_collision, self.forbidden_area_collision, self.chaser_target_collision]):
             pass
@@ -485,7 +515,7 @@ class Environment:
         done = False
         
         # If we've docked with the target
-        if np.linalg.norm(self.end_effector_position - self.docking_port_position) <= self.SUCCESSFUL_DOCKING_DISTANCE:
+        if self.docked:
             return True
 
         # If we've fallen off the table, end the episode

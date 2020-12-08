@@ -100,7 +100,7 @@ class Environment:
         self.TIMESTEP                         =   0.2 # [s]
         self.DYNAMICS_DELAY                   =   0 # [timesteps of delay] how many timesteps between when an action is commanded and when it is realized
         self.AUGMENT_STATE_WITH_ACTION_LENGTH =   0 # [timesteps] how many timesteps of previous actions should be included in the state. This helps with making good decisions among delayed dynamics.
-        self.MAX_NUMBER_OF_TIMESTEPS          = 150 # per episode
+        self.MAX_NUMBER_OF_TIMESTEPS          = 100 # per episode
         self.ADDITIONAL_VALUE_INFO            = False # whether or not to include additional reward and value distribution information on the animations
         self.SKIP_FAILED_ANIMATIONS           = True # Error the program or skip when animations fail?
 
@@ -395,7 +395,7 @@ class Environment:
         if self.GIVE_MID_WAY_REWARD and self.not_yet_mid_way and self.mid_way:
             if self.test_time:
                 print("Just passed the mid-way mark. Distance: %.3f at time %.1f" %(np.linalg.norm(self.end_effector_position - self.docking_port_position), self.time))
-                self.not_yet_mid_way = False
+            self.not_yet_mid_way = False
             reward += self.MID_WAY_REWARD
             #Debug why this gets printed 4 times sometimes at the end of the episode!
         

@@ -15,7 +15,7 @@ class Settings:
     ##### Run Settings #####
     ########################
 
-    RUN_NAME               = 'mid_way_reward' # use just the name. If trying to restore from file, use name along with timestamp
+    RUN_NAME               = 'mid_way_reward_nopriority' # use just the name. If trying to restore from file, use name along with timestamp
     ENVIRONMENT            = 'SPOT'
     AGENT                  = ''
     RECORD_VIDEO           = True
@@ -51,7 +51,7 @@ class Settings:
     DISPLAY_ACTOR_PERFORMANCE_EVERY_NUM_EPISODES      = 2500
 
     # Buffer settings
-    PRIORITY_REPLAY_BUFFER = True
+    PRIORITY_REPLAY_BUFFER = False
     PRIORITY_ALPHA         = 0.6            # Controls the randomness vs prioritisation of the prioritised sampling (0.0 = Uniform sampling, 1.0 = Greedy prioritisation)
     PRIORITY_BETA_START    = 0.4       # Starting value of beta - controls to what degree IS weights influence the gradient updates to correct for the bias introduced by priority sampling (0 - no correction, 1 - full correction)
     PRIORITY_BETA_END      = 1.0         # Beta will be linearly annealed from its start value to this value throughout training

@@ -413,7 +413,7 @@ class Environment:
         if self.chaser_position[0] > 4 or self.chaser_position[0] < -1 or self.chaser_position[1] > 3 or self.chaser_position[1] < -1 or self.chaser_position[2] > 6*np.pi or self.chaser_position[2] < -6*np.pi:
             reward -= self.FALL_OFF_TABLE_PENALTY
 
-        return reward # possibly add .squeeze() if the shape is not ()
+        return reward
     
     def check_collisions(self):
         """ Calculate whether the different objects are colliding with the target. 

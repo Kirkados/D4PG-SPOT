@@ -15,7 +15,7 @@ class Settings:
     ##### Run Settings #####
     ########################
 
-    RUN_NAME               = 'mid_way_reward_nopriority' # use just the name. If trying to restore from file, use name along with timestamp
+    RUN_NAME               = 'velocity_penalty50' # use just the name. If trying to restore from file, use name along with timestamp
     ENVIRONMENT            = 'SPOT'
     AGENT                  = ''
     RECORD_VIDEO           = True

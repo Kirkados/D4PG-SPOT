@@ -410,7 +410,7 @@ class Environment:
             reward -= self.END_EFFECTOR_COLLISION_PENALTY
         
         # If we've fallen off the table, penalize this behaviour
-        if self.chaser_position[0] > 4 or self.chaser_position[0] < -1 or self.chaser_position[1] > 3 or self.chaser_position[1] < -1 or self.chaser_position[2] > 6*np.pi or self.chaser_position[2] < -6*np.pi:
+        if self.chaser_position[0] > 4 or self.chaser_position[0] < -1 or self.chaser_position[1] > 3 or self.chaser_position[1] < -1 or self.chaser_position[2] > 4*np.pi or self.chaser_position[2] < -4*np.pi:
             reward -= self.FALL_OFF_TABLE_PENALTY
 
         return reward
@@ -519,7 +519,7 @@ class Environment:
             return True
 
         # If we've fallen off the table, end the episode
-        if self.chaser_position[0] > 4 or self.chaser_position[0] < -1 or self.chaser_position[1] > 3 or self.chaser_position[1] < -1 or self.chaser_position[2] > 6*np.pi or self.chaser_position[2] < -6*np.pi:
+        if self.chaser_position[0] > 4 or self.chaser_position[0] < -1 or self.chaser_position[1] > 3 or self.chaser_position[1] < -1 or self.chaser_position[2] > 4*np.pi or self.chaser_position[2] < -4*np.pi:
             if self.test_time:
                 print("Fell off table!")
             return True

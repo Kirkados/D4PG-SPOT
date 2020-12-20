@@ -201,6 +201,7 @@ class Agent:
                     done_log = []
                     discount_factor_log = []
                     raw_total_state_log.append(total_state)
+                    cumulative_reward_log.append(0) # initializing with 0 at the initial state
                     
 
 
@@ -255,6 +256,8 @@ class Agent:
 
                 # Add reward we just received to running total for this episode
                 episode_reward += reward
+                if self.n_agent == 1 and Settings.RECORD_VIDEO and (episode_number % (Settings.CHECK_GREEDY_PERFORMANCE_EVERY_NUM_EPISODES*Settings.VIDEO_RECORD_FREQUENCY) == 0 or episode_number == 1) and not Settings.ENVIRONMENT == 'gym':
+                    cumulative_reward_log.append(episode_reward)
                 
                 # Augment total_state with past actions, if appropriate
                 if Settings.AUGMENT_STATE_WITH_ACTION_LENGTH > 0:
@@ -299,7 +302,6 @@ class Agent:
                         observation_log.append(observation_0)
                         action_log.append(action_0)
                         next_observation_log.append(next_observation)
-                        cumulative_reward_log.append(episode_reward)
                         instantaneous_reward_log.append(n_step_reward)
                         done_log.append(done)
                         discount_factor_log.append(discount_factor)

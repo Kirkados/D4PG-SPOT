@@ -88,7 +88,7 @@ class Environment:
         self.INITIAL_TARGET_POSITION          = np.array([2.0, 1.0, 0.0]) # [m, m, rad]
         self.INITIAL_TARGET_VELOCITY          = np.array([0.0, 0.0, 0.0]) # [m/s, m/s, rad/s]
         self.NORMALIZE_STATE                  = True # Normalize state on each timestep to avoid vanishing gradients
-        self.RANDOMIZE                        = False # whether or not to RANDOMIZE the state & target location
+        self.RANDOMIZE                        = True # whether or not to RANDOMIZE the state & target location
         self.RANDOMIZATION_LENGTH             = 0.5 # [m] standard deviation of position randomization
         self.RANDOMIZATION_ANGLE              = np.pi/2 # [rad] standard deviation of angular randomization
         self.RANDOMIZATION_TARGET_VELOCITY    = 0.0 # [m/s] standard deviation of the target's velocity randomization

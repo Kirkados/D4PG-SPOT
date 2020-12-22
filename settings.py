@@ -15,7 +15,7 @@ class Settings:
     ##### Run Settings #####
     ########################
 
-    RUN_NAME               = 'velocity_penalty50_gamma1_4piend_random' # use just the name. If trying to restore from file, use name along with timestamp
+    RUN_NAME               = 'velocity_penalty50_gamma1_4piend_random_uniform' # use just the name. If trying to restore from file, use name along with timestamp
     ENVIRONMENT            = 'SPOT'
     AGENT                  = ''
     RECORD_VIDEO           = True

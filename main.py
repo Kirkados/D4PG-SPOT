@@ -154,7 +154,7 @@ if not Settings.RESUME_TRAINING:
 #######################################
 with tf.Session(config = config) as sess:
     if Settings.RESUME_TRAINING:
-        print("\nThis run is continuing " + os.path.basename(os.path.normpath(os.getcwd() + '/..')))
+        print("\nThis run is continuing: " + os.path.basename(os.path.normpath(os.getcwd() + '/..')))
     else:
         print("\nThis run is named " + filename)
     print("\nThe environment file is: environment_" + Settings.ENVIRONMENT + '\n')

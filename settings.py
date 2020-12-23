@@ -95,7 +95,7 @@ class Settings:
     ##### Save Settings #####
     #########################
     if RESUME_TRAINING:
-        MODEL_SAVE_DIRECTORY             = '../'
+        MODEL_SAVE_DIRECTORY             = '../' # up one folder
     else:
         MODEL_SAVE_DIRECTORY             = 'Tensorboard/Current/' # where to save all data
     TENSORBOARD_FILE_EXTENSION           = '.tensorboard' # file extension for tensorboard file

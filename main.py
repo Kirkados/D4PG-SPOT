@@ -224,9 +224,10 @@ with tf.Session(config = config) as sess:
 
     # Initializing replay buffer, with the option of a prioritized replay buffer
     if Settings.PRIORITY_REPLAY_BUFFER:
+        # Loading is not implemented on prioritized replay buffer
         replay_buffer = PrioritizedReplayBuffer()
     else:
-        replay_buffer = ReplayBuffer()
+        replay_buffer = ReplayBuffer(filename)
 
     # Initializing thread & process list
     threads = []
@@ -360,12 +361,13 @@ with tf.Session(config = config) as sess:
             time.sleep(0.5)
             if counter % 1200 == 0:
                 print("Main.py (Environment %s) is using %2.3f GB of RAM and the buffer has %i samples" %(Settings.RUN_NAME, process.memory_info().rss/1000000000.0, replay_buffer.how_filled()))
+                
             counter += 1
 
             # If all agents have finished, gracefully stop the learner and end
             if np.sum(each_thread.is_alive() for each_thread in threads) <= 1:
                 print("All threads ended naturally.")
-                
+                                
                 # Gracefully stop learner
                 stop_run_flag.set()
                 # Join threads (suspends main.py until threads finish)
@@ -374,7 +376,7 @@ with tf.Session(config = config) as sess:
                 break
             
     except KeyboardInterrupt: # if someone pressed Ctrl + C
-        print("Interrupted by user!")
+        print("\nInterrupted by user!")
         print("Stopping all the threads!!")
         # Gracefully stop all threads, ending episodes and saving data
         stop_run_flag.set()

@@ -15,7 +15,7 @@ class Settings:
     ##### Run Settings #####
     ########################
 
-    RUN_NAME               = 'test_resuming_lowTimesteps_2' # use just the name. If trying to restore from file, use name along with timestamp
+    RUN_NAME               = 'velocity_penalty50_gamma1_4piend_random_uniform' # use just the name. If trying to restore from file, use name along with timestamp
     RESUME_TRAINING        = False # If True, main.py must be run from a previous run's 'code' folder.
     ENVIRONMENT            = 'SPOT'
     AGENT                  = ''

@@ -82,7 +82,7 @@ class Environment:
         self.LOWER_ACTION_BOUND               = np.array([-0.025, -0.025, -0.1]) # [m/s^2, m/s^2, rad/s^2]
         self.UPPER_ACTION_BOUND               = np.array([ 0.025,  0.025,  0.1]) # [m/s^2, m/s^2, rad/s^2]
         self.LOWER_STATE_BOUND                = np.array([-3., -3., -self.MAX_VELOCITY, -self.MAX_VELOCITY, -2*np.pi, -2*self.MAX_ANGULAR_VELOCITY, 0. , 0. , -6*np.pi, 0. , 0. , -6*np.pi, -self.MAX_VELOCITY, -self.MAX_VELOCITY, -self.MAX_ANGULAR_VELOCITY, -self.MAX_VELOCITY, -self.MAX_VELOCITY, -self.MAX_ANGULAR_VELOCITY]) # [m, m, m/s, m/s, rad, rad/s, m, m, rad, m, m, rad, m/s, m/s, rad/s, m/s, m/s, rad/s] // lower bound for each element of TOTAL_STATE
-        self.UPPER_STATE_BOUND                = np.array([ 3.,  3.,  self.MAX_VELOCITY,  self.MAX_VELOCITY,  2*np.pi,  2*self.MAX_ANGULAR_VELOCITY, 3.7, 2.4,  6*np.pi, 3.7, 2.4,  6*np.pi,  self.MAX_VELOCITY,  self.MAX_VELOCITY,  self.MAX_ANGULAR_VELOCITY,  self.MAX_VELOCITY,  self.MAX_VELOCITY,  self.MAX_ANGULAR_VELOCITY]) # [m, m, m,s, m,s, rad, rad/s, m, m, rad, m, m, rad, m/s, m/s, rad/s, m/s, m/s, rad/s] // upper bound for each element of TOTAL_STATE
+        self.UPPER_STATE_BOUND                = np.array([ 3.,  3.,  self.MAX_VELOCITY,  self.MAX_VELOCITY,  2*np.pi,  2*self.MAX_ANGULAR_VELOCITY, 3.5, 2.4,  6*np.pi, 3.7, 2.4,  6*np.pi,  self.MAX_VELOCITY,  self.MAX_VELOCITY,  self.MAX_ANGULAR_VELOCITY,  self.MAX_VELOCITY,  self.MAX_VELOCITY,  self.MAX_ANGULAR_VELOCITY]) # [m, m, m,s, m,s, rad, rad/s, m, m, rad, m, m, rad, m/s, m/s, rad/s, m/s, m/s, rad/s] // upper bound for each element of TOTAL_STATE
         self.INITIAL_CHASER_POSITION          = np.array([1.23, 1.2, 0.0]) # [m, m, rad]
         self.INITIAL_CHASER_VELOCITY          = np.array([0.0, 0.0, 0.0]) # [m/s, m/s, rad/s]
         self.INITIAL_TARGET_POSITION          = np.array([2.46, 1.2, 0.0]) # [m, m, rad]
@@ -96,12 +96,12 @@ class Environment:
         self.MIN_V                            = -100.
         self.MAX_V                            =  125.
         self.N_STEP_RETURN                    =   5
-        self.DISCOUNT_FACTOR                  =   1.0#0.95**(1/self.N_STEP_RETURN)
+        self.DISCOUNT_FACTOR                  =   0.97**(1/self.N_STEP_RETURN)
         self.TIMESTEP                         =   0.2 # [s]
         self.DYNAMICS_DELAY                   =   0 # [timesteps of delay] how many timesteps between when an action is commanded and when it is realized
         self.AUGMENT_STATE_WITH_ACTION_LENGTH =   0 # [timesteps] how many timesteps of previous actions should be included in the state. This helps with making good decisions among delayed dynamics.
         self.MAX_NUMBER_OF_TIMESTEPS          = 150 # per episode
-        self.ADDITIONAL_VALUE_INFO            = False # whether or not to include additional reward and value distribution information on the animations
+        self.ADDITIONAL_VALUE_INFO            = True # whether or not to include additional reward and value distribution information on the animations
         self.SKIP_FAILED_ANIMATIONS           = True # Error the program or skip when animations fail?
 
         # Physical properties
@@ -750,7 +750,7 @@ def render(states, actions, instantaneous_reward_log, cumulative_reward_log, cri
 
     if extra_information:
         grid_spec = gridspec.GridSpec(nrows = 2, ncols = 3, figure = figure)
-        subfig1 = figure.add_subplot(grid_spec[0,0], aspect = 'equal', autoscale_on = False, xlim = (0, 3.7), ylim = (0, 2.4))
+        subfig1 = figure.add_subplot(grid_spec[0,0], aspect = 'equal', autoscale_on = False, xlim = (0, 3.5), ylim = (0, 2.4))
         #subfig1 = figure.add_subplot(grid_spec[0,0], projection = '3d', aspect = 'equal', autoscale_on = False, xlim3d = (-5, 5), ylim3d = (-5, 5), zlim3d = (0, 10), xlabel = 'X (m)', ylabel = 'Y (m)', zlabel = 'Z (m)')
         subfig2 = figure.add_subplot(grid_spec[0,1], xlim = (np.min([np.min(instantaneous_reward_log), 0]) - (np.max(instantaneous_reward_log) - np.min(instantaneous_reward_log))*0.02, np.max([np.max(instantaneous_reward_log), 0]) + (np.max(instantaneous_reward_log) - np.min(instantaneous_reward_log))*0.02), ylim = (-0.5, 0.5))
         subfig3 = figure.add_subplot(grid_spec[0,2], xlim = (np.min(loss_log)-0.01, np.max(loss_log)+0.01), ylim = (-0.5, 0.5))
@@ -794,7 +794,7 @@ def render(states, actions, instantaneous_reward_log, cumulative_reward_log, cri
         subfig6.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.])
 
     else:
-        subfig1 = figure.add_subplot(1, 1, 1, aspect = 'equal', autoscale_on = False, xlim = (0, 3.7), ylim = (0, 2.4), xlabel = 'X Position (m)', ylabel = 'Y Position (m)')
+        subfig1 = figure.add_subplot(1, 1, 1, aspect = 'equal', autoscale_on = False, xlim = (0, 3.5), ylim = (0, 2.4), xlabel = 'X Position (m)', ylabel = 'Y Position (m)')
      
 
     # Defining plotting objects that change each frame
@@ -810,8 +810,8 @@ def render(states, actions, instantaneous_reward_log, cumulative_reward_log, cri
         q_dist_bar           = subfig4.bar(x = bins, height = np.zeros(shape = len(bins)), width = bins[1]-bins[0])
         target_q_dist_bar    = subfig5.bar(x = bins, height = np.zeros(shape = len(bins)), width = bins[1]-bins[0])
         projected_q_dist_bar = subfig6.bar(x = bins, height = np.zeros(shape = len(bins)), width = bins[1]-bins[0])
-        time_text            = subfig1.text2D(x = 0.2, y = 0.91, s = '', fontsize = 8, transform=subfig1.transAxes)
-        reward_text          = subfig1.text2D(x = 0.0,  y = 1.02, s = '', fontsize = 8, transform=subfig1.transAxes)
+        time_text            = subfig1.text(x = 0.2, y = 0.91, s = '', fontsize = 8, transform=subfig1.transAxes)
+        reward_text          = subfig1.text(x = 0.0, y = 1.02, s = '', fontsize = 8, transform=subfig1.transAxes)
     else:        
         time_text    = subfig1.text(x = 0.1, y = 0.9, s = '', fontsize = 8, transform=subfig1.transAxes)
         reward_text  = subfig1.text(x = 0.62, y = 0.9, s = '', fontsize = 8, transform=subfig1.transAxes)
@@ -843,30 +843,33 @@ def render(states, actions, instantaneous_reward_log, cumulative_reward_log, cri
         # Update the reward text
         reward_text.set_text('Total reward = %.1f' %cumulative_reward_log[frame])
         
-        if extra_information:
-            # Updating the instantaneous reward bar graph
-            reward_bar[0].set_width(instantaneous_reward_log[frame])
-            # And colouring it appropriately
-            if instantaneous_reward_log[frame] < 0:
-                reward_bar[0].set_color('r')
-            else:
-                reward_bar[0].set_color('g')
-
-            # Updating the loss bar graph
-            loss_bar[0].set_width(loss_log[frame])
-
-            # Updating the q-distribution plot
-            for this_bar, new_value in zip(q_dist_bar, critic_distributions[frame,:]):
-                this_bar.set_height(new_value)
-
-            # Updating the target q-distribution plot
-            for this_bar, new_value in zip(target_q_dist_bar, target_critic_distributions[frame, :]):
-                this_bar.set_height(new_value)
-
-            # Updating the projected target q-distribution plot
-            for this_bar, new_value in zip(projected_q_dist_bar, projected_target_distribution[frame, :]):
-                this_bar.set_height(new_value)
-#
+        try:
+            if extra_information:
+                # Updating the instantaneous reward bar graph
+                reward_bar[0].set_width(instantaneous_reward_log[frame])
+                # And colouring it appropriately
+                if instantaneous_reward_log[frame] < 0:
+                    reward_bar[0].set_color('r')
+                else:
+                    reward_bar[0].set_color('g')
+    
+                # Updating the loss bar graph
+                loss_bar[0].set_width(loss_log[frame])
+    
+                # Updating the q-distribution plot
+                for this_bar, new_value in zip(q_dist_bar, critic_distributions[frame,:]):
+                    this_bar.set_height(new_value)
+    
+                # Updating the target q-distribution plot
+                for this_bar, new_value in zip(target_q_dist_bar, target_critic_distributions[frame, :]):
+                    this_bar.set_height(new_value)
+    
+                # Updating the projected target q-distribution plot
+                for this_bar, new_value in zip(projected_q_dist_bar, projected_target_distribution[frame, :]):
+                    this_bar.set_height(new_value)
+        except:
+            pass
+    #
         # Since blit = True, must return everything that has changed at this frame
         return chaser_body_dot, time_text, chaser_body, chaser_front_face, target_body, target_front_face 
 

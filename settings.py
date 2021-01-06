@@ -15,7 +15,7 @@ class Settings:
     ##### Run Settings #####
     ########################
 
-    RUN_NAME               = 'velocity_penalty50_gamma1_4piend_random_uniform' # use just the name. If trying to restore from file, use name along with timestamp
+    RUN_NAME               = 'sweepGamma97'#'velocity_penalty50_gamma95_4piend_random_uniform'
     RESUME_TRAINING        = False # If True, main.py must be run from a previous run's 'code' folder.
     ENVIRONMENT            = 'SPOT'
     AGENT                  = ''

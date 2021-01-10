@@ -471,8 +471,6 @@ class Environment:
         mid_way_circle = Point(self.target_position[:-1] + np.matmul(C_Ib_target, self.DOCKING_PORT_MOUNT_POSITION)).buffer(self.MID_WAY_REWARD_RADIUS)
         
         # Elbow position in the inertial frame
-        C_Ib_chaser = self.make_C_bI(self.chaser_position[-1]).T        
-        # Position in Inertial = Body position (inertial) + C_Ib * EE position in body
         elbow_position = self.chaser_position[:-1] + np.matmul(C_Ib_chaser, self.ELBOW_POSITION)
         elbow_point = Point(elbow_position)
         

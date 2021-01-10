@@ -96,7 +96,7 @@ class Environment:
         self.MIN_V                            = -100.
         self.MAX_V                            =  125.
         self.N_STEP_RETURN                    =   5
-        self.DISCOUNT_FACTOR                  =   0.99**(1/self.N_STEP_RETURN)
+        self.DISCOUNT_FACTOR                  =   0.999**(1/self.N_STEP_RETURN)
         self.TIMESTEP                         =   0.2 # [s]
         self.DYNAMICS_DELAY                   =   0 # [timesteps of delay] how many timesteps between when an action is commanded and when it is realized
         self.AUGMENT_STATE_WITH_ACTION_LENGTH =   0 # [timesteps] how many timesteps of previous actions should be included in the state. This helps with making good decisions among delayed dynamics.
@@ -409,6 +409,9 @@ class Environment:
         if self.forbidden_area_collision:
             reward -= self.END_EFFECTOR_COLLISION_PENALTY
         
+        if self.elbow_target_collision:
+            reward -= self.END_EFFECTOR_COLLISION_PENALTY
+        
         # If we've fallen off the table, penalize this behaviour
         if self.chaser_position[0] > 4 or self.chaser_position[0] < -1 or self.chaser_position[1] > 3 or self.chaser_position[1] < -1 or self.chaser_position[2] > 4*np.pi or self.chaser_position[2] < -4*np.pi:
             reward -= self.FALL_OFF_TABLE_PENALTY
@@ -418,7 +421,7 @@ class Environment:
     def check_collisions(self):
         """ Calculate whether the different objects are colliding with the target. 
         
-            Returns 3 booleans: end_effector_collision, forbidden_area_collision, chaser_target_collision
+            Updates 6 booleans: end_effector_collision, forbidden_area_collision, chaser_target_collision, docked, mid_way, elbow_target_collision
         """
         
         ##################################################
@@ -467,6 +470,13 @@ class Environment:
         # Mid-way Polygon (circle)
         mid_way_circle = Point(self.target_position[:-1] + np.matmul(C_Ib_target, self.DOCKING_PORT_MOUNT_POSITION)).buffer(self.MID_WAY_REWARD_RADIUS)
         
+        # Elbow position in the inertial frame
+        C_Ib_chaser = self.make_C_bI(self.chaser_position[-1]).T        
+        # Position in Inertial = Body position (inertial) + C_Ib * EE position in body
+        elbow_position = self.chaser_position[:-1] + np.matmul(C_Ib_chaser, self.ELBOW_POSITION)
+        elbow_point = Point(elbow_position)
+        
+        
         ###########################
         ### Checking collisions ###
         ###########################
@@ -475,6 +485,7 @@ class Environment:
         self.chaser_target_collision = False
         self.docked = False
         self.mid_way = False
+        self.elbow_target_collision = False
         
         if self.CHECK_END_EFFECTOR_COLLISION and end_effector_point.within(target_polygon):
             if self.test_time:
@@ -500,6 +511,11 @@ class Environment:
             if self.test_time:
                 print("Docked!")
             self.docked = True
+        
+        if self.CHECK_END_EFFECTOR_COLLISION and elbow_point.within(target_polygon):
+            if self.test_time:
+                print("Elbow/target collision!")
+            self.elbow_target_collision = True
             
         if not np.any([self.end_effector_collision, self.forbidden_area_collision, self.chaser_target_collision]):
             pass

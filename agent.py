@@ -364,7 +364,6 @@ class Agent:
 
                 except queue.Empty:
                     print("Skipping this animation!")
-                    raise SystemExit
 
             # Periodically update the agent with the learner's most recent version of the actor network parameters
             if episode_number % Settings.UPDATE_ACTORS_EVERY_NUM_EPISODES == 0:

@@ -130,6 +130,7 @@ class Environment:
         self.CHECK_END_EFFECTOR_COLLISION     = True # Whether to do collision detection on the end-effector
         self.CHECK_END_EFFECTOR_FORBIDDEN     = True # Whether to expand the collision area to include the forbidden zone
         self.END_EFFECTOR_COLLISION_PENALTY   = 5 # [rewards/timestep] Penalty for end-effector collisions (with target or optionally with the forbidden zone)
+        self.END_ON_COLLISION                 = True # Whether to end the episode upon a collision to prevent collisions more drastically.
         self.GIVE_MID_WAY_REWARD              = True # Whether or not to give a reward mid-way towards the docking port to encourage the learning to move in the proper direction
         self.MID_WAY_REWARD_RADIUS            = 0.3 # [ms] the radius from the DOCKING_PORT_MOUNT_POSITION that the mid-way reward is given
         self.MID_WAY_REWARD                   = 25 # The value of the mid-way reward
@@ -510,14 +511,11 @@ class Environment:
                 print("Docked!")
             self.docked = True
         
+        # Elbow can enter the forbidden area
         if self.CHECK_END_EFFECTOR_COLLISION and elbow_point.within(target_polygon):
             if self.test_time:
                 print("Elbow/target collision!")
             self.elbow_target_collision = True
-            
-        if not np.any([self.end_effector_collision, self.forbidden_area_collision, self.chaser_target_collision]):
-            pass
-            #print("No collisions")                                                            
 
 
     def is_done(self):
@@ -526,8 +524,7 @@ class Environment:
             NOTE: THE ENVIRONMENT MUST RETURN done = True IF THE EPISODE HAS
                   REACHED ITS LAST TIMESTEP
         """
-        done = False
-        
+
         # If we've docked with the target
         if self.docked:
             return True
@@ -537,12 +534,19 @@ class Environment:
             if self.test_time:
                 print("Fell off table!")
             return True
+        
+        # If we want to end the episode during a collision
+        if self.END_ON_COLLISION and np.any([self.end_effector_collision, self.forbidden_area_collision, self.chaser_target_collision, self.elbow_target_collision]):
+            if self.test_time:
+                print("Ending episode due to a collision")
+            return True
 
         # If we've run out of timesteps
         if round(self.time/self.TIMESTEP) == self.MAX_NUMBER_OF_TIMESTEPS:
             return True
-
-        return done
+        
+        # Continue the episode
+        return False
 
 
     def generate_queue(self):

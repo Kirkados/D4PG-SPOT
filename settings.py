@@ -15,7 +15,7 @@ class Settings:
     ##### Run Settings #####
     ########################
 
-    RUN_NAME               = 'elbow_50angle_5collide_rotate2pi30'#'velocity_penalty50_gamma95_4piend_random_uniform'
+    RUN_NAME               = 'stopOnCollide_Spin'#'velocity_penalty50_gamma95_4piend_random_uniform'
     RESUME_TRAINING        = False # If True, main.py must be run from a previous run's 'code' folder.
     ENVIRONMENT            = 'SPOT'
     AGENT                  = ''

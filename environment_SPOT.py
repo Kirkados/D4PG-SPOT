@@ -93,7 +93,7 @@ class Environment:
         self.RANDOMIZATION_ANGLE              = np.pi # [rad] half-range uniform randomization chaser and target angle
         self.RANDOMIZATION_TARGET_VELOCITY    = 0.0 # [m/s] half-range uniform randomization target velocity
         self.RANDOMIZATION_TARGET_OMEGA       = 2*np.pi/30 # [rad/s] half-range uniform randomization target omega
-        self.MIN_V                            = -250.
+        self.MIN_V                            = -100.
         self.MAX_V                            =  125.
         self.N_STEP_RETURN                    =   5
         self.DISCOUNT_FACTOR                  =   0.95**(1/self.N_STEP_RETURN)
@@ -130,7 +130,7 @@ class Environment:
         self.CHECK_END_EFFECTOR_COLLISION     = True # Whether to do collision detection on the end-effector
         self.CHECK_END_EFFECTOR_FORBIDDEN     = True # Whether to expand the collision area to include the forbidden zone
         self.END_EFFECTOR_COLLISION_PENALTY   = 50 # [rewards/timestep] Penalty for end-effector collisions (with target or optionally with the forbidden zone)
-        self.END_ON_COLLISION                 = False # Whether to end the episode upon a collision to prevent collisions more drastically.
+        self.END_ON_COLLISION                 = True # Whether to end the episode upon a collision to prevent collisions more drastically.
         self.GIVE_MID_WAY_REWARD              = True # Whether or not to give a reward mid-way towards the docking port to encourage the learning to move in the proper direction
         self.MID_WAY_REWARD_RADIUS            = 0.1 # [ms] the radius from the DOCKING_PORT_MOUNT_POSITION that the mid-way reward is given
         self.MID_WAY_REWARD                   = 25 # The value of the mid-way reward

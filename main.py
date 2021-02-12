@@ -375,6 +375,10 @@ with tf.Session(config = config) as sess:
                     each_thread.join()
                 break
             
+            if (time.time() - start_time) > 60*60*24:
+                print("\nEnding due to max runtime of 1 day reached!")
+                raise KeyboardInterrupt
+            
     except KeyboardInterrupt: # if someone pressed Ctrl + C
         print("\nInterrupted by user!")
         print("Stopping all the threads!!")

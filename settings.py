@@ -15,7 +15,7 @@ class Settings:
     ##### Run Settings #####
     ########################
 
-    RUN_NAME               = '5penalty_noChaserPoisition_spin'#'velocity_penalty50_gamma95_4piend_random_uniform'
+    RUN_NAME               = 'doubleTime_table-wideUniform_properArm_spin'#'velocity_penalty50_gamma95_4piend_random_uniform'
     RESUME_TRAINING        = False # If True, main.py must be run from a previous run's 'code' folder.
     ENVIRONMENT            = 'SPOT'
     AGENT                  = ''

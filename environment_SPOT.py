@@ -86,13 +86,14 @@ class Environment:
         self.UPPER_ACTION_BOUND               = np.array([ 0.025,  0.025,  0.1]) # [m/s^2, m/s^2, rad/s^2]
         self.LOWER_STATE_BOUND                = np.array([-3., -3., -self.MAX_VELOCITY, -self.MAX_VELOCITY, -2*np.pi, -2*self.MAX_ANGULAR_VELOCITY, 0. , 0. , -6*np.pi, 0. , 0. , -6*np.pi, -self.MAX_VELOCITY, -self.MAX_VELOCITY, -self.MAX_ANGULAR_VELOCITY, -self.MAX_VELOCITY, -self.MAX_VELOCITY, -self.MAX_ANGULAR_VELOCITY]) # [m, m, m/s, m/s, rad, rad/s, m, m, rad, m, m, rad, m/s, m/s, rad/s, m/s, m/s, rad/s] // lower bound for each element of TOTAL_STATE
         self.UPPER_STATE_BOUND                = np.array([ 3.,  3.,  self.MAX_VELOCITY,  self.MAX_VELOCITY,  2*np.pi,  2*self.MAX_ANGULAR_VELOCITY, 3.5, 2.4,  6*np.pi, 3.5, 2.4,  6*np.pi,  self.MAX_VELOCITY,  self.MAX_VELOCITY,  self.MAX_ANGULAR_VELOCITY,  self.MAX_VELOCITY,  self.MAX_VELOCITY,  self.MAX_ANGULAR_VELOCITY]) # [m, m, m,s, m,s, rad, rad/s, m, m, rad, m, m, rad, m/s, m/s, rad/s, m/s, m/s, rad/s] // upper bound for each element of TOTAL_STATE
-        self.INITIAL_CHASER_POSITION          = np.array([1.16, 1.2, 0.0]) # [m, m, rad]
+        self.INITIAL_CHASER_POSITION          = np.array([3.5/2, 1.2, 0.0]) # [m, m, rad]
         self.INITIAL_CHASER_VELOCITY          = np.array([0.0, 0.0, 0.0]) # [m/s, m/s, rad/s]
-        self.INITIAL_TARGET_POSITION          = np.array([2.33, 1.2, 0.0]) # [m, m, rad]
+        self.INITIAL_TARGET_POSITION          = np.array([3.5/2, 1.2, 0.0]) # [m, m, rad]
         self.INITIAL_TARGET_VELOCITY          = np.array([0.0, 0.0, 0.0]) # [m/s, m/s, rad/s]
         self.NORMALIZE_STATE                  = True # Normalize state on each timestep to avoid vanishing gradients
         self.RANDOMIZE                        = True # whether or not to RANDOMIZE the state & target location
-        self.RANDOMIZATION_LENGTH             = 0.5 # [m] half-range uniform randomization position
+        self.RANDOMIZATION_LENGTH_X           = 3.5/2-0.2 # [m] half-range uniform randomization X position
+        self.RANDOMIZATION_LENGTH_Y           = 2.4/2-0.2 # [m] half-range uniform randomization Y position
         self.RANDOMIZATION_ANGLE              = np.pi # [rad] half-range uniform randomization chaser and target angle
         self.RANDOMIZATION_TARGET_VELOCITY    = 0.0 # [m/s] half-range uniform randomization target velocity
         self.RANDOMIZATION_TARGET_OMEGA       = 2*np.pi/30 # [rad/s] half-range uniform randomization target omega
@@ -103,7 +104,7 @@ class Environment:
         self.TIMESTEP                         =   0.2 # [s]
         self.DYNAMICS_DELAY                   =   0 # [timesteps of delay] how many timesteps between when an action is commanded and when it is realized
         self.AUGMENT_STATE_WITH_ACTION_LENGTH =   0 # [timesteps] how many timesteps of previous actions should be included in the state. This helps with making good decisions among delayed dynamics.
-        self.MAX_NUMBER_OF_TIMESTEPS          = 150 # per episode
+        self.MAX_NUMBER_OF_TIMESTEPS          = 300#150 # per episode
         self.ADDITIONAL_VALUE_INFO            = False # whether or not to include additional reward and value distribution information on the animations
         self.SKIP_FAILED_ANIMATIONS           = True # Error the program or skip when animations fail?
 
@@ -183,9 +184,9 @@ class Environment:
         # If we are randomizing the initial conditions and state
         if self.RANDOMIZE:
             # Randomizing initial state in Inertial frame
-            self.chaser_position = self.INITIAL_CHASER_POSITION + np.random.uniform(low = -1, high = 1, size = 3)*[self.RANDOMIZATION_LENGTH, self.RANDOMIZATION_LENGTH, self.RANDOMIZATION_ANGLE]
+            self.chaser_position = self.INITIAL_CHASER_POSITION + np.random.uniform(low = -1, high = 1, size = 3)*[self.RANDOMIZATION_LENGTH_X, self.RANDOMIZATION_LENGTH_Y, self.RANDOMIZATION_ANGLE]
             # Randomizing target state in Inertial frame
-            self.target_position = self.INITIAL_TARGET_POSITION + np.random.uniform(low = -1, high = 1, size = 3)*[self.RANDOMIZATION_LENGTH, self.RANDOMIZATION_LENGTH, self.RANDOMIZATION_ANGLE]
+            self.target_position = self.INITIAL_TARGET_POSITION + np.random.uniform(low = -1, high = 1, size = 3)*[self.RANDOMIZATION_LENGTH_X, self.RANDOMIZATION_LENGTH_Y, self.RANDOMIZATION_ANGLE]
             # Randomizing target velocity in Inertial frame
             self.target_velocity = self.INITIAL_TARGET_VELOCITY + np.random.uniform(low = -1, high = 1, size = 3)*[self.RANDOMIZATION_TARGET_VELOCITY, self.RANDOMIZATION_TARGET_VELOCITY, self.RANDOMIZATION_TARGET_OMEGA]
             

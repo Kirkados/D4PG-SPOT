@@ -110,16 +110,51 @@ class Environment:
 
         # Physical properties
         self.LENGTH                        = 0.3  # [m] side length
-        self.MASS                          = 10.0   # [kg] for chaser
-        self.INERTIA                       = 1/12*self.MASS*(self.LENGTH**2 + self.LENGTH**2) # 0.15 [kg m^2]
+        #self.MASS                          = 10.0   # [kg] for chaser
+        #self.INERTIA                       = 1/12*self.MASS*(self.LENGTH**2 + self.LENGTH**2) # 0.15 [kg m^2]
         self.DOCKING_PORT_MOUNT_POSITION   = np.array([0, self.LENGTH/2]) # position of the docking cone on the target in its body frame
         self.DOCKING_PORT_CORNER1_POSITION = self.DOCKING_PORT_MOUNT_POSITION + [ 0.05, 0.1] # position of the docking cone on the target in its body frame
         self.DOCKING_PORT_CORNER2_POSITION = self.DOCKING_PORT_MOUNT_POSITION + [-0.05, 0.1] # position of the docking cone on the target in its body frame
-        self.ARM_MOUNT_POSITION            = np.array([0, self.LENGTH/2]) # [m] position of the arm mounting point on the chaser in the body frame
-        self.SHOULDER_POSITION             = self.ARM_MOUNT_POSITION + [0, 0.05] # [m] position of the arm's shoulder in the chaser body frame
-        self.ELBOW_POSITION                = self.SHOULDER_POSITION + [0.3*np.sin(np.pi/6), 0.3*np.cos(np.pi/6)] # [m] position of the arm's elbow in the chaser body frame
-        self.WRIST_POSITION                = self.ELBOW_POSITION + [0.3*np.sin(np.pi/4),-0.3*np.cos(np.pi/4)] # [m] position of the arm's wrist in the chaser body frame
-        self.END_EFFECTOR_POSITION         = self.WRIST_POSITION + [0.1, 0] # po sition of the optimally-deployed end-effector on the chaser in the body frame
+        
+        self.PHI      = -24.34*np.pi/180 # [rad] angle of anchor point of arm with respect to spacecraft body frame
+        self.B0       = 0.2586 # scalar distance from centre of mass to arm attachment point
+        self.THETA_1  = 1.053 # [rad] optimal final orientation of joint 1
+        self.THETA_2  = -1.36 # [rad] optimal final orientation of joint 2
+        self.THETA_3  =  0.3068 # [rad] optimal final orientation of joint 3
+        self.MASS_C   = 17.6429  # [kg] for chaser
+        self.M1       = 0.3377 # [kg] link mass
+        self.M2       = 0.3281 # [kg] link mass
+        self.M3       = 0.0111 # [kg] link mass
+        self.MASS     = self.MASS_C + self.M1 + self.M2 + self.M3 # [kg] total mass
+        self.A1       = 0.1933 # [m] base of link to centre of mass
+        self.B1       = 0.1117 # [m] centre of mass to end of link
+        self.A2       = 0.1993 # [m] base of link to centre of mass
+        self.B2       = 0.1057 # [m] centre of mass to end of link
+        self.A3       = 0.0621 # [m] base of link to centre of mass
+        self.B3       = 0.0159 # [m] centre of mass to end of link
+        self.INERTIA_C = 2.873E-1 # [kg m^2] base inertia
+        self.INERTIA1 = 3.75E-3 # [kg m^2] link inertia
+        self.INERTIA2 = 3.413E-3 # [kg m^2] link inertia
+        self.INERTIA3 = 5.64E-5 # [kg m^2] link inertia
+
+        # Fixed optimal arm orientation
+        self.SHOULDER_POSITION = self.B0*np.array([np.cos(self.PHI), np.sin(self.PHI)]) # [m] position of the arm mounting point on the chaser in the body frame
+        self.ELBOW_POSITION = self.SHOULDER_POSITION + (self.A1 + self.B1)*np.array([np.cos(self.THETA_1), np.sin(self.THETA_1)])
+        self.WRIST_POSITION = self.ELBOW_POSITION + (self.A2 + self.B2)*np.array([np.cos(self.THETA_1 + self.THETA_2), np.sin(self.THETA_1 + self.THETA_2)])
+        self.END_EFFECTOR_POSITION = self.WRIST_POSITION + (self.A3 + self.B3)*np.array([np.cos(self.THETA_1 + self.THETA_2 + self.THETA_3), np.sin(self.THETA_1 + self.THETA_2 + self.THETA_3)])
+        self.ARM_MOUNT_POSITION = self.SHOULDER_POSITION - np.array([0.08,0])
+        
+        # Calculate combined inertia
+        self.R1 = self.SHOULDER_POSITION + (self.A1)*np.array([np.cos(self.THETA_1), np.sin(self.THETA_1)])
+        self.R2 = self.ELBOW_POSITION + (self.A2)*np.array([np.cos(self.THETA_1 + self.THETA_2), np.sin(self.THETA_1 + self.THETA_2)])
+        self.R3 = self.WRIST_POSITION + (self.A3)*np.array([np.cos(self.THETA_1 + self.THETA_2 + self.THETA_3), np.sin(self.THETA_1 + self.THETA_2 + self.THETA_3)])
+        self.INERTIA = self.INERTIA_C + self.INERTIA1 + self.M1*np.linalg.norm(self.R1)**2 + self.INERTIA2 + self.M2*np.linalg.norm(self.R2)**2 + self.INERTIA3 + self.M3*np.linalg.norm(self.R3)**2
+        
+        # self.ARM_MOUNT_POSITION            = np.array([0, self.LENGTH/2]) # [m] position of the arm mounting point on the chaser in the body frame
+        # self.SHOULDER_POSITION             = self.ARM_MOUNT_POSITION + [0, 0.05] # [m] position of the arm's shoulder in the chaser body frame
+        # self.ELBOW_POSITION                = self.SHOULDER_POSITION + [0.3*np.sin(np.pi/6), 0.3*np.cos(np.pi/6)] # [m] position of the arm's elbow in the chaser body frame
+        # self.WRIST_POSITION                = self.ELBOW_POSITION + [0.3*np.sin(np.pi/4),-0.3*np.cos(np.pi/4)] # [m] position of the arm's wrist in the chaser body frame
+        # self.END_EFFECTOR_POSITION         = self.WRIST_POSITION + [0.1, 0] # po sition of the optimally-deployed end-effector on the chaser in the body frame
         
         # Reward function properties
         self.DOCKING_REWARD                   = 100 # A lump-sum given to the chaser when it docks

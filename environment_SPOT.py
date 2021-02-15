@@ -112,9 +112,13 @@ class Environment:
         self.LENGTH                        = 0.3  # [m] side length
         #self.MASS                          = 10.0   # [kg] for chaser
         #self.INERTIA                       = 1/12*self.MASS*(self.LENGTH**2 + self.LENGTH**2) # 0.15 [kg m^2]
-        self.DOCKING_PORT_MOUNT_POSITION   = np.array([0, self.LENGTH/2]) # position of the docking cone on the target in its body frame
-        self.DOCKING_PORT_CORNER1_POSITION = self.DOCKING_PORT_MOUNT_POSITION + [ 0.05, 0.1] # position of the docking cone on the target in its body frame
-        self.DOCKING_PORT_CORNER2_POSITION = self.DOCKING_PORT_MOUNT_POSITION + [-0.05, 0.1] # position of the docking cone on the target in its body frame
+        #self.DOCKING_PORT_MOUNT_POSITION   = np.array([0, self.LENGTH/2]) # position of the docking cone on the target in its body frame
+        #self.DOCKING_PORT_CORNER1_POSITION = self.DOCKING_PORT_MOUNT_POSITION + [ 0.05, 0.1] # position of the docking cone on the target in its body frame
+        #self.DOCKING_PORT_CORNER2_POSITION = self.DOCKING_PORT_MOUNT_POSITION + [-0.05, 0.1] # position of the docking cone on the target in its body frame
+        
+        self.DOCKING_PORT_MOUNT_POSITION = np.array([0.06944, 0.21007]) # [m] with respect to the centre of mass
+        self.DOCKING_PORT_CORNER1_POSITION = self.DOCKING_PORT_MOUNT_POSITION + [ 0.0508, 0.0432562] # position of the docking cone on the target in its body frame
+        self.DOCKING_PORT_CORNER2_POSITION = self.DOCKING_PORT_MOUNT_POSITION + [-0.0508, 0.0432562] # position of the docking cone on the target in its body frame
         
         self.PHI      = -24.34*np.pi/180 # [rad] angle of anchor point of arm with respect to spacecraft body frame
         self.B0       = 0.2586 # scalar distance from centre of mass to arm attachment point
@@ -780,6 +784,7 @@ def render(states, actions, instantaneous_reward_log, cumulative_reward_log, cri
                                    [-LENGTH/2,-LENGTH/2],
                                    [-LENGTH/2, LENGTH/2],
                                    [ LENGTH/2, LENGTH/2],
+                                   [DOCKING_PORT_MOUNT_POSITION[0], LENGTH/2], # artificially adding this to make the docking cone look better 
                                    [DOCKING_PORT_MOUNT_POSITION[0],DOCKING_PORT_MOUNT_POSITION[1]],
                                    [DOCKING_PORT_CORNER1_POSITION[0],DOCKING_PORT_CORNER1_POSITION[1]],
                                    [DOCKING_PORT_CORNER2_POSITION[0],DOCKING_PORT_CORNER2_POSITION[1]],

@@ -246,6 +246,12 @@ class Environment:
         
         # Check for collisions
         self.check_collisions()
+        # If we are colliding (unfairly) upon a reset, reset the environment again!
+        if self.end_effector_collision or self.forbidden_area_collision or self.chaser_target_collision or self.elbow_target_collision:
+            # Reset the environment again!
+            self.reset(use_dynamics, test_time)
+        
+        
 
         # Initializing the previous velocity and control effort for the integral-acceleration controller
         self.previous_velocity = np.zeros(len(self.INITIAL_CHASER_VELOCITY))

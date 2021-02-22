@@ -96,7 +96,7 @@ class Environment:
         self.RANDOMIZATION_LENGTH_Y           = 2.4/2-0.2 # [m] half-range uniform randomization Y position
         self.RANDOMIZATION_ANGLE              = np.pi # [rad] half-range uniform randomization chaser and target angle
         self.RANDOMIZATION_TARGET_VELOCITY    = 0.0 # [m/s] half-range uniform randomization target velocity
-        self.RANDOMIZATION_TARGET_OMEGA       = 2*np.pi/30 # [rad/s] half-range uniform randomization target omega
+        self.RANDOMIZATION_TARGET_OMEGA       = 0#2*np.pi/30 # [rad/s] half-range uniform randomization target omega
         self.MIN_V                            = -100.
         self.MAX_V                            =  125.
         self.N_STEP_RETURN                    =   5

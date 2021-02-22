@@ -184,7 +184,7 @@ class Environment:
         self.KINEMATIC_POSITION_NOISE_SD = [0.2, 0.2, 0.2] # The standard deviation of the noise that is to be applied to each position element in the state
         self.KINEMATIC_VELOCITY_NOISE_SD = [0.1, 0.1, 0.1] # The standard deviation of the noise that is to be applied to each velocity element in the state
         self.FORCE_NOISE_AT_TEST_TIME    = False # [Default -> False] Whether or not to force kinematic noise to be present at test time
-        self.KI                          = [10, 10, 0.05] # Integral gain for the integral-linear acceleration controller in [X, Y, and angle] (how fast does the commanded acceleration get realized)
+        self.KI                          = [18.3, 18.3, 0.45] # Integral gain for the integral-linear acceleration controller in [X, Y, and angle] (how fast does the commanded acceleration get realized)
         
         
         # Some calculations that don't need to be changed
@@ -361,6 +361,8 @@ class Environment:
         
         current_velocity = self.chaser_velocity # [v_x, v_y, omega]
         current_accelerations = (current_velocity - self.previous_velocity)/self.TIMESTEP # Approximating the current acceleration [a_x, a_y, alpha]
+        
+        print("Current accelerations ", current_accelerations)
         
         # Checking whether our velocity is too large AND the acceleration is trying to increase said velocity... in which case we set the desired_linear_acceleration to zero.
         desired_accelerations[(np.abs(current_velocity) > self.VELOCITY_LIMIT) & (np.sign(desired_accelerations) == np.sign(current_velocity))] = 0        
@@ -671,6 +673,10 @@ class Environment:
                 
                 # Rotating the action from the body frame into the inertial frame
                 action[:-1] = np.matmul(self.make_C_bI(self.chaser_position[-1]).T, action[:-1])
+                
+                action[0] = 0
+                action[1] = 0
+                action[2] = self.UPPER_ACTION_BOUND[2]
             
 
                 ################################

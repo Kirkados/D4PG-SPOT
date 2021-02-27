@@ -150,7 +150,7 @@ with tf.Session() as sess:
             ### Cap output if we are exceeding the max allowable velocity ###
             #################################################################
             # Checking whether our velocity is too large AND the acceleration is trying to increase said velocity... in which case we set the desired_linear_acceleration to zero.
-            current_velocity = np.array([red_x, red_y, red_omega])
+            current_velocity = np.array([red_vx, red_vy, red_omega])
             deep_guidance[(np.abs(current_velocity) > Settings.VELOCITY_LIMIT) & (np.sign(deep_guidance) == np.sign(current_velocity))] = 0  
 
             # Return commanded action to the Raspberry Pi 3

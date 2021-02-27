@@ -17,13 +17,28 @@ import time
 from settings import Settings
 from build_neural_networks import BuildActorNetwork
 
+"""
+*# Relative pose expressed in the chaser's body frame; everything else in Inertial frame #*
+Deep guidance output in x and y are in the chaser body frame
+"""
+
+def make_C_bI(angle):        
+    C_bI = np.array([[ np.cos(angle), np.sin(angle)],
+                     [-np.sin(angle), np.cos(angle)]]) # [2, 2]        
+    return C_bI
+
 #%%
 testing = True # [boolean] Set to True for testing purposes (without using the Jetson)
-counter = 1
+
+offset_x = 0 # amount the end-effector misses the target * In the chaser's body frame *
+offset_y = 0 # amount the end-effector misses the target * In the chaser's body frame *
+offset_angle = 0 # amount the end-effector misses the target
+
 
 #%%
 # Clear any old graph
 tf.reset_default_graph()
+counter = 1
 
 # Initialize Tensorflow, and load in policy
 with tf.Session() as sess:
@@ -50,6 +65,10 @@ with tf.Session() as sess:
     ##################################################
     # Initializing
     connected = False
+    
+    # Parameters for normalizing the input
+    relevant_state_mean = np.delete(Settings.STATE_MEAN, Settings.IRRELEVANT_STATES)
+    relevant_half_range = np.delete(Settings.STATE_HALF_RANGE, Settings.IRRELEVANT_STATES)
 
     # Looping forever
     while True:
@@ -84,46 +103,55 @@ with tf.Session() as sess:
 
             # Receive position data
             if testing:
-                input_data_array = np.zeros(Settings.TOTAL_STATE_SIZE)
+                input_data_array = np.array([3.5/3, 2.4/2, 0, 0,0,0, 3.5*2/3, 2.4/2, np.pi/2, 0, 0, 0])
             else:
                 input_data_array = np.array(input_data.splitlines()).astype(np.float32)
-                # input_data_array is: [time, red_x, red_y, red_theta, black_x, black_y, black_theta]
-            
-    	    # Calculating the proper policy input
-            # Want the input to be: [red_x, red_y, red_theta, x_error, y_error, theta_error]
-            # and we want it to be scaled properly
-            
-            # Determining the phase we are in
-            if input_data_array[0] < 135: # 45 + phase_2_end_time
-                # Hold point phase!
-                desired_x = input_data_array[4] + 0.9*np.cos(input_data_array[6])
-                desired_y = input_data_array[5] + 0.9*np.sin(input_data_array[6])
-                desired_angle = input_data_array[6] - np.pi
-            else:
-                # Docking phase!
-                desired_x = input_data_array[4] + 0.5*np.cos(input_data_array[6])
-                desired_y = input_data_array[5] + 0.5*np.sin(input_data_array[6])
-                desired_angle = input_data_array[6] - np.pi
+                # input_data_array is: [red_x, red_y, red_theta, red_vx, red_vy, red_omega, black_x, black_y, black_theta, black_vx, black_vy, black_omega]                
+            red_x, red_y, red_theta, red_vx, red_vy, red_omega, black_x, black_y, black_theta, black_vx, black_vy, black_omega = input_data_array
+                
+            ##############################################################
+            ### Receive relative pose information from Computer vision ###
+            ##############################################################
+            #TODO: Receive these things from Frank
+            frank_sees_target = False
+            frank_relative_x = 0
+            frank_relative_y = 0
+            frank_relative_angle = 0            
                         
+
             #################################
             ### Building the Policy Input ###
-            #################################
-            policy_input = input_data_array
+            #################################            
+            # Total state is [relative_x, relative_y, relative_vx, relative_vy, relative_angle, relative_angular_velocity, chaser_x, chaser_y, chaser_theta, target_x, target_y, target_theta, chaser_vx, chaser_vy, chaser_omega, target_vx, target_vy, target_omega] *# Relative pose expressed in the chaser's body frame; everythign else in Inertial frame #*
+            # State input: [relative_x, relative_y, relative_angle, chaser_theta, chaser_vx, chaser_vy, chaser_omega, target_omega]
+            # Also normalize it properly
+            
+            if frank_sees_target:
+                policy_input = np.array([frank_relative_x, frank_relative_y, frank_relative_angle - offset_angle, red_theta, red_vx, red_vy, red_omega, black_omega])
+            else:
+                # Calculating the relative X and Y in the chaser's body frame
+                relative_pose_inertial = np.array([black_x - red_x - offset_x, black_y - red_y - offset_y])
+                relative_pose_body = np.matmul(make_C_bI(red_theta), relative_pose_inertial)
+                policy_input = np.array([relative_pose_body[0], relative_pose_body[1], (black_theta - red_theta - offset_angle)%(2*np.pi), red_theta, red_vx, red_vy, red_omega, black_omega])
 
-            # Normalizing
+            # Normalizing            
             if Settings.NORMALIZE_STATE:
-                normalized_policy_input = (policy_input - Settings.STATE_MEAN)/Settings.STATE_HALF_RANGE
+                normalized_policy_input = (policy_input - relevant_state_mean)/relevant_half_range
             else:
                 normalized_policy_input = policy_input
-
-            # Discarding irrelevant states
-            normalized_policy_input = np.delete(normalized_policy_input, Settings.IRRELEVANT_STATES)
-
+                
             # Reshaping the input
             normalized_policy_input = normalized_policy_input.reshape([-1, Settings.OBSERVATION_SIZE])
 
             # Run processed state through the policy
             deep_guidance = sess.run(actor.action_scaled, feed_dict={state_placeholder:normalized_policy_input})[0] # [accel_x, accel_y, alpha]
+            
+            #################################################################
+            ### Cap output if we are exceeding the max allowable velocity ###
+            #################################################################
+            # Checking whether our velocity is too large AND the acceleration is trying to increase said velocity... in which case we set the desired_linear_acceleration to zero.
+            current_velocity = np.array([red_x, red_y, red_omega])
+            deep_guidance[(np.abs(current_velocity) > Settings.VELOCITY_LIMIT) & (np.sign(deep_guidance) == np.sign(current_velocity))] = 0  
 
             # Return commanded action to the Raspberry Pi 3
             if testing:
@@ -132,11 +160,12 @@ with tf.Session() as sess:
                 out_data = str(deep_guidance[0]) + "\n" + str(deep_guidance[1]) + "\n" + str(deep_guidance[2]) + "\n"
                 client_socket.send(out_data.encode())
             
-            if counter % 200 == 0:
-                print("Input from Pi: ", input_data_array)
-                print("Policy input: ", policy_input)
-                print("Normalized policy input: ", normalized_policy_input)
-                print("Output to Pi: ", deep_guidance)
+            if counter % 2000 == 0:
+                #print("Input from Pi: ", input_data_array)
+                #print("Policy input: ", policy_input)
+                #print("Normalized policy input: ", normalized_policy_input)
+                print("Output to Pi: ", deep_guidance, " In RED body frame")
+                print(normalized_policy_input)
             # Incrementing the counter
             counter = counter + 1
 

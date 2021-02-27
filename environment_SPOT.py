@@ -77,7 +77,7 @@ class Environment:
         #self.IRRELEVANT_STATES                = [6,7,8,9,10,11,12,13,14,15,16,17] # [original] indices of states who are irrelevant to the policy network
         #self.IRRELEVANT_STATES                = [2,3,5,9,10,11] # [chaser_x, chaser_y, chaser_theta, relative_x, relative_y, relative_angle, chaser_vx, chaser_vy, chaser_omega, target_vx, target_vy, target_omega]
         #self.IRRELEVANT_STATES                = [2,3,5,6,7,9,10,11] # [chaser_theta, relative_x, relative_y, relative_angle, chaser_vx, chaser_vy, chaser_omega, target_vx, target_vy, target_omega] # omitting chaser_x, chaser_y
-        self.IRRELEVANT_STATES                = [2,3,5,6,7,9,10,11,15,16] # [chaser_theta, relative_x, relative_y, relative_angle, chaser_vx, chaser_vy, chaser_omega, target_omega] # omitting chaser_x, chaser_y, target_vx, target_vy
+        self.IRRELEVANT_STATES                = [2,3,5,6,7,9,10,11,15,16] # [relative_x, relative_y, relative_angle, chaser_theta, chaser_vx, chaser_vy, chaser_omega, target_omega]; [chaser_theta, relative_x, relative_y, relative_angle, chaser_vx, chaser_vy, chaser_omega, target_omega] # omitting chaser_x, chaser_y, target_vx, target_vy
         self.OBSERVATION_SIZE                 = self.TOTAL_STATE_SIZE - len(self.IRRELEVANT_STATES) # the size of the observation input to the policy
         self.ACTION_SIZE                      = 3 # [x_dot_dot, y_dot_dot, theta_dot_dot] in the BODY frame
         self.MAX_VELOCITY                     = 0.2 # [m/s]
@@ -96,7 +96,7 @@ class Environment:
         self.RANDOMIZATION_LENGTH_Y           = 2.4/2-0.2 # [m] half-range uniform randomization Y position
         self.RANDOMIZATION_ANGLE              = np.pi # [rad] half-range uniform randomization chaser and target angle
         self.RANDOMIZATION_TARGET_VELOCITY    = 0.0 # [m/s] half-range uniform randomization target velocity
-        self.RANDOMIZATION_TARGET_OMEGA       = 0#2*np.pi/30 # [rad/s] half-range uniform randomization target omega
+        self.RANDOMIZATION_TARGET_OMEGA       = 2*np.pi/30 # [rad/s] half-range uniform randomization target omega
         self.MIN_V                            = -100.
         self.MAX_V                            =  125.
         self.N_STEP_RETURN                    =   5

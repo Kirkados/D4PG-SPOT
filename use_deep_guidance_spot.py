@@ -85,7 +85,8 @@ with tf.Session() as sess:
         else: # We are connected!
             if not testing:
                 try: # Try to receive data
-                    data = client_socket.recv(4096)
+                    client_socket.recv(4096) # Clear the buffer
+                    data = client_socket.recv(4096) # Read the next value
                 except: # If receive fails, we have lost communication with the JetsonRepeater
                     print("Lost communication with JetsonRepeater")
                     connected = False

@@ -96,7 +96,7 @@ with tf.Session() as sess:
                     break
                 else: # We got good data!
                     input_data = data.decode("utf-8")
-                    #print('Got message: ' + str(data.decode("utf-8")))
+                    print('Got message: ' + str(data.decode("utf-8")))
 
             ############################################################
             ##### Received data! Process it and return the result! #####
@@ -104,11 +104,11 @@ with tf.Session() as sess:
 
             # Receive position data
             if testing:
-                input_data_array = np.array([3.5/3, 2.4/2, 0, 0,0,0, 3.5*2/3, 2.4/2, np.pi/2, 0, 0, 0])
+                input_data_array = np.array([10, 3.5/3, 2.4/2, 0, 0,0,0, 3.5*2/3, 2.4/2, np.pi/2, 0, 0, 0])
             else:
                 input_data_array = np.array(input_data.splitlines()).astype(np.float32)
                 # input_data_array is: [red_x, red_y, red_theta, red_vx, red_vy, red_omega, black_x, black_y, black_theta, black_vx, black_vy, black_omega]                
-            red_x, red_y, red_theta, red_vx, red_vy, red_omega, black_x, black_y, black_theta, black_vx, black_vy, black_omega = input_data_array
+            time, red_x, red_y, red_theta, red_vx, red_vy, red_omega, black_x, black_y, black_theta, black_vx, black_vy, black_omega = input_data_array
                 
             ##############################################################
             ### Receive relative pose information from Computer vision ###
@@ -147,10 +147,18 @@ with tf.Session() as sess:
             # Run processed state through the policy
             deep_guidance = sess.run(actor.action_scaled, feed_dict={state_placeholder:normalized_policy_input})[0] # [accel_x, accel_y, alpha]
             
+            # Rotating the command into the inertial frame
+            deep_guidance[:-1] = np.matmul(make_C_bI(red_theta).T,deep_guidance[:-1])
+     
+            # Commanding constant values in the inertial frame for testing purposes
+            #deep_guidance[0] = -0.02 # [m/s^2]
+            #deep_guidance[1] = 0.02 # [m/s^2]
+            #deep_guidance[2] = -np.pi/60 # [rad/s^2]														  
             #################################################################
             ### Cap output if we are exceeding the max allowable velocity ###
             #################################################################
             # Checking whether our velocity is too large AND the acceleration is trying to increase said velocity... in which case we set the desired_linear_acceleration to zero.
+			# this is in the inertial frame							   
             current_velocity = np.array([red_vx, red_vy, red_omega])
             deep_guidance[(np.abs(current_velocity) > Settings.VELOCITY_LIMIT) & (np.sign(deep_guidance) == np.sign(current_velocity))] = 0  
 
@@ -165,7 +173,7 @@ with tf.Session() as sess:
                 #print("Input from Pi: ", input_data_array)
                 #print("Policy input: ", policy_input)
                 #print("Normalized policy input: ", normalized_policy_input)
-                print("Output to Pi: ", deep_guidance, " In RED body frame")
+                print("Output to Pi: ", deep_guidance, " In table inertial frame")
                 print(normalized_policy_input)
             # Incrementing the counter
             counter = counter + 1

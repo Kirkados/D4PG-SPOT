@@ -148,7 +148,7 @@ class Environment:
         self.END_EFFECTOR_POSITION = self.WRIST_POSITION + (self.A3 + self.B3)*np.array([np.cos(self.THETA_1 + self.THETA_2 + self.THETA_3), np.sin(self.THETA_1 + self.THETA_2 + self.THETA_3)])
         self.ARM_MOUNT_POSITION = self.SHOULDER_POSITION - np.array([0.08,0])
         
-        # Calculate combined inertia
+        # Calculate combined inertia at arm's final optimally-deployed state
         self.R1 = self.SHOULDER_POSITION + (self.A1)*np.array([np.cos(self.THETA_1), np.sin(self.THETA_1)])
         self.R2 = self.ELBOW_POSITION + (self.A2)*np.array([np.cos(self.THETA_1 + self.THETA_2), np.sin(self.THETA_1 + self.THETA_2)])
         self.R3 = self.WRIST_POSITION + (self.A3)*np.array([np.cos(self.THETA_1 + self.THETA_2 + self.THETA_3), np.sin(self.THETA_1 + self.THETA_2 + self.THETA_3)])

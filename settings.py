@@ -15,7 +15,7 @@ class Settings:
     ##### Run Settings #####
     ########################
 
-    RUN_NAME               = 'TESTTIME_1AGENT1EPIDOSE_newgains_spin'#'velocity_penalty50_gamma95_4piend_random_uniform'
+    RUN_NAME               = 'TESTTIME_newgains_spin'#'velocity_penalty50_gamma95_4piend_random_uniform'
     RESUME_TRAINING        = False # If True, main.py must be run from a previous run's 'code' folder.
     ENVIRONMENT            = 'SPOT'
     AGENT                  = ''
@@ -32,8 +32,8 @@ class Settings:
     #############################
 
     # Hyperparameters
-    NUMBER_OF_ACTORS        = 1
-    NUMBER_OF_EPISODES      = 1#1e10 # that each agent will perform
+    NUMBER_OF_ACTORS        = 10
+    NUMBER_OF_EPISODES      = 1e10 # that each agent will perform
     MAX_TRAINING_ITERATIONS = 1e10 # of neural networks
     ACTOR_LEARNING_RATE     = 0.0001
     CRITIC_LEARNING_RATE    = 0.0001

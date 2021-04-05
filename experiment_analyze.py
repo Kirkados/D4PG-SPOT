@@ -88,4 +88,4 @@ for i in range(len(data)):
     
 
 # Render the episode
-environment_file.render(np.asarray(raw_total_state_log), 0, 0, np.asarray(cumulative_reward_log), 0, 0, 0, 0, 0, 1, log_filename.split('.')[0], os.getcwd(), time_log)
+environment_file.render(np.asarray(raw_total_state_log), 0, 0, np.asarray(cumulative_reward_log), 0, 0, 0, 0, 0, 1, log_filename.split('.')[0], '', time_log)

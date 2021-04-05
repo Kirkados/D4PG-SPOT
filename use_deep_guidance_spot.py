@@ -179,6 +179,9 @@ class DeepGuidanceModelRunner:
         relevant_state_mean = np.delete(Settings.STATE_MEAN, Settings.IRRELEVANT_STATES)
         relevant_half_range = np.delete(Settings.STATE_HALF_RANGE, Settings.IRRELEVANT_STATES)
         
+        # To log data
+        data_log = []
+        
         # Run until we want to stop
         while not stop_run_flag.is_set():            
                        
@@ -249,10 +252,19 @@ class DeepGuidanceModelRunner:
                 print(normalized_policy_input)
             # Incrementing the counter
             counter = counter + 1
+            
+            # Log this timestep's data
+            data_log.append([Pi_time, Pi_red_x, Pi_red_y, Pi_red_theta, \
+                             Pi_red_Vx, Pi_red_Vy, Pi_red_omega,        \
+                             Pi_black_x, Pi_black_y, Pi_black_theta,    \
+                             Pi_black_Vx, Pi_black_Vy, Pi_black_omega,  \
+                             SPOTNet_relative_x, SPOTNet_relative_y, SPOTNet_relative_angle, SPOTNet_sees_target])
         
         print("Model gently stopped.")
-        
-        #TODO: SAVE DATA TO FILE
+
+        print("Saving data to file")
+        with open('deep_guidance_data_' + time.strftime('%Y-%m-%d-%H:%M:%S', time.localtime()) + '.txt', 'wb') as f:
+                np.save(f, np.asarray(data_log))
         
         # Close tensorflow session
         self.sess.close()
@@ -261,7 +273,7 @@ class DeepGuidanceModelRunner:
 
 
 # Are we testing?
-testing = False
+testing = True
 
 ##################################################
 #### Start communication with JetsonRepeater #####

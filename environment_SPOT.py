@@ -247,11 +247,9 @@ class Environment:
         # Check for collisions
         self.check_collisions()
         # If we are colliding (unfairly) upon a reset, reset the environment again!
-        if self.end_effector_collision or self.forbidden_area_collision or self.chaser_target_collision or self.elbow_target_collision:
+        if self.end_effector_collision or self.forbidden_area_collision or self.chaser_target_collision or self.elbow_target_collision or not self.chaser_fully_on_table: 
             # Reset the environment again!
-            self.reset(use_dynamics, test_time)
-        
-        
+            self.reset(use_dynamics, test_time)        
 
         # Initializing the previous velocity and control effort for the integral-acceleration controller
         self.previous_velocity = np.zeros(len(self.INITIAL_CHASER_VELOCITY))
@@ -463,7 +461,7 @@ class Environment:
             reward -= self.END_EFFECTOR_COLLISION_PENALTY
         
         # If we've fallen off the table, penalize this behaviour
-        if self.chaser_position[0] > 4 or self.chaser_position[0] < -1 or self.chaser_position[1] > 3 or self.chaser_position[1] < -1 or self.chaser_position[2] > 4*np.pi or self.chaser_position[2] < -4*np.pi:
+        if not self.chaser_fully_on_table or self.chaser_position[2] > 6*np.pi or self.chaser_position[2] < -6*np.pi:
             reward -= self.FALL_OFF_TABLE_PENALTY
 
         return reward
@@ -524,6 +522,13 @@ class Environment:
         elbow_position = self.chaser_position[:-1] + np.matmul(C_Ib_chaser, self.ELBOW_POSITION)
         elbow_point = Point(elbow_position)
         
+        # Table coordinates
+        table_coordinates = np.array([[0,   0],
+                                      [3.5, 0],
+                                      [3.5, 2.4],
+                                      [0,   2.4]])
+        table_polygon = Polygon(table_coordinates)
+        
         
         ###########################
         ### Checking collisions ###
@@ -534,6 +539,7 @@ class Environment:
         self.docked = False
         self.mid_way = False
         self.elbow_target_collision = False
+        self.chaser_fully_on_table = True
         
         if self.CHECK_END_EFFECTOR_COLLISION and end_effector_point.within(target_polygon):
             if self.test_time:
@@ -565,6 +571,12 @@ class Environment:
             if self.test_time:
                 print("Elbow/target collision!")
             self.elbow_target_collision = True
+        
+        # If we've fallen off the table (the chaser body intersects a table edge)
+        if self.END_ON_FALL and chaser_polygon.overlaps(table_polygon):
+            if self.test_time:
+                print("Fell off table!")
+            self.chaser_fully_on_table = False
 
 
     def is_done(self):
@@ -578,10 +590,8 @@ class Environment:
         if self.docked:
             return True
 
-        # If we've fallen off the table, end the episode
-        if self.chaser_position[0] > 4 or self.chaser_position[0] < -1 or self.chaser_position[1] > 3 or self.chaser_position[1] < -1 or self.chaser_position[2] > 4*np.pi or self.chaser_position[2] < -4*np.pi:
-            if self.test_time:
-                print("Fell off table!")
+        # If we've fallen off the table or spun too much, end the episode
+        if not self.chaser_fully_on_table or self.chaser_position[2] > 6*np.pi or self.chaser_position[2] < -6*np.pi:
             return True
         
         # If we want to end the episode during a collision

@@ -7,16 +7,21 @@ import numpy as np
 import glob
 import os
 import matplotlib.pyplot as plt
+from pyvirtualdisplay import Display # for rendering
  
 from settings import Settings
 environment_file = __import__('environment_' + Settings.ENVIRONMENT) # importing the environment
 
+# Generate a virtual display for plotting
+display = Display(visible = False, size = (1400,900))
+display.start()
 
 #####################################
 ### Load in the experimental data ###
 #####################################
 log_filename = glob.glob('*.txt')[0]
 data = np.load(log_filename)
+print("Data file %s is loaded" %log_filename)
 
 ########################
 ### Plot some things ###
@@ -26,14 +31,17 @@ deep_guidances_ax = data[:,1]
 deep_guidances_ay = data[:,2]
 deep_guidances_alpha = data[:,3]
 
+
 plt.figure()
 plt.plot(time_log, deep_guidances_ax)
 plt.plot(time_log, deep_guidances_ay)
-plt.savefig("Acceleration Commands.png")
+plt.savefig(log_filename.split('.')[0] + "/Acceleration Commands.png")
+print("Saved acceleration commands figure")
 
 plt.figure()
 plt.plot(time_log, deep_guidances_alpha)
-plt.savefig("Angular Acceleration commands.png")
+plt.savefig(log_filename.split('.')[0] + "/Angular Acceleration commands.png")
+print("Saved angular acceleration commands figure")
 
 
 
@@ -50,6 +58,7 @@ environment.reset(False,False)
 #target_x, target_y, target_theta, chaser_vx, chaser_vy, chaser_omega, 
 #target_vx, target_vy, target_omega] *# Relative pose expressed in the chaser's body frame; everythign else in Inertial frame #*
 
+print("Rendering animation...", end='')
 raw_total_state_log = []
 cumulative_reward_log = []
 cumulative_rewards = 0
@@ -89,3 +98,8 @@ for i in range(len(data)):
 
 # Render the episode
 environment_file.render(np.asarray(raw_total_state_log), 0, 0, np.asarray(cumulative_reward_log), 0, 0, 0, 0, 0, 1, log_filename.split('.')[0], '', time_log)
+print("Done!")
+# Close the display
+del environment
+plt.close()
+display.stop()

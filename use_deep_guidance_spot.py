@@ -254,7 +254,8 @@ class DeepGuidanceModelRunner:
             counter = counter + 1
             
             # Log this timestep's data
-            data_log.append([Pi_time, Pi_red_x, Pi_red_y, Pi_red_theta, \
+            data_log.append([Pi_time, deep_guidance[0], deep_guidance[1], deep_guidance[2], \
+                             Pi_red_x, Pi_red_y, Pi_red_theta, \
                              Pi_red_Vx, Pi_red_Vy, Pi_red_omega,        \
                              Pi_black_x, Pi_black_y, Pi_black_theta,    \
                              Pi_black_Vx, Pi_black_Vy, Pi_black_omega,  \
@@ -263,7 +264,7 @@ class DeepGuidanceModelRunner:
         print("Model gently stopped.")
 
         print("Saving data to file")
-        with open('deep_guidance_data_' + time.strftime('%Y-%m-%d-%H:%M:%S', time.localtime()) + '.txt', 'wb') as f:
+        with open('deep_guidance_data_' + time.strftime('%Y-%m-%d-%H_%M-%S', time.localtime()) + '.txt', 'wb') as f:
                 np.save(f, np.asarray(data_log))
         
         # Close tensorflow session

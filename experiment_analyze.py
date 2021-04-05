@@ -6,6 +6,7 @@ It should be run from the folder where use_deep_guidance.py was run from for the
 import numpy as np
 import glob
 import os
+import matplotlib.pyplot as plt
  
 from settings import Settings
 environment_file = __import__('environment_' + Settings.ENVIRONMENT) # importing the environment
@@ -17,9 +18,28 @@ environment_file = __import__('environment_' + Settings.ENVIRONMENT) # importing
 log_filename = glob.glob('*.txt')[0]
 data = np.load(log_filename)
 
+########################
+### Plot some things ###
+########################
 time_log = data[:,0]
+deep_guidances_ax = data[:,1]
+deep_guidances_ay = data[:,2]
+deep_guidances_alpha = data[:,3]
+
+plt.figure()
+plt.plot(time_log, deep_guidances_ax)
+plt.plot(time_log, deep_guidances_ay)
+plt.savefig("Acceleration Commands.png")
+
+plt.figure()
+plt.plot(time_log, deep_guidances_alpha)
+plt.savefig("Angular Acceleration commands.png")
 
 
+
+##########################
+### Animate the motion ###
+##########################
 # Generate an Environment to use for reward logging
 environment = environment_file.Environment()
 environment.reset(False,False)
@@ -34,7 +54,8 @@ raw_total_state_log = []
 cumulative_reward_log = []
 cumulative_rewards = 0
 for i in range(len(data)):
-    Pi_time, Pi_red_x, Pi_red_y, Pi_red_theta, \
+    Pi_time, deep_guidance_ax, deep_guidance_ay, deep_guidance_alpha, \
+    Pi_red_x, Pi_red_y, Pi_red_theta, \
     Pi_red_Vx, Pi_red_Vy, Pi_red_omega,        \
     Pi_black_x, Pi_black_y, Pi_black_theta,    \
     Pi_black_Vx, Pi_black_Vy, Pi_black_omega,  \
@@ -67,4 +88,4 @@ for i in range(len(data)):
     
 
 # Render the episode
-environment_file.render(np.asarray(raw_total_state_log), 0, 0, np.asarray(cumulative_reward_log), 0, 0, 0, 0, 0, 1, 'ExperimentAnimation', os.getcwd(), time_log)
+environment_file.render(np.asarray(raw_total_state_log), 0, 0, np.asarray(cumulative_reward_log), 0, 0, 0, 0, 0, 1, log_filename.split('.')[0], os.getcwd(), time_log)

@@ -22,6 +22,7 @@ display.start()
 log_filename = glob.glob('*.txt')[0]
 data = np.load(log_filename)
 print("Data file %s is loaded" %log_filename)
+os.makedirs(log_filename.split('.')[0], exist_ok=True)
 
 ########################
 ### Plot some things ###

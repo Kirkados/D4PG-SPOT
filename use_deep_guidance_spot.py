@@ -99,24 +99,28 @@ class MessageParser:
                 self.Pi_black_omega = 0
             else:
                 # It's real
-                data = self.client_socket.recv(4096) # Read the next value
+                try:
+                    data = self.client_socket.recv(4096) # Read the next value
+                except socket.timeout:
+                    print("Socket timeout")
+                    continue
                 data_packet = np.array(data.decode("utf-8").splitlines())
-                print('Got message: ' + str(data.decode("utf-8")))
+                #print('Got message: ' + str(data.decode("utf-8")))
     
                 # Check if it's a SpotNet packet or a Pi packet
                 if data_packet[0] == "SPOTNet":
-                    # We received a SPOTNet packet, update those variables accordingly
-                    print("SpotNet packet!")                
+                    # We received a SPOTNet packet, update those variables accordingly           
                     self.SPOTNet_relative_x     = float(data_packet[1].astype(np.float32))
                     self.SPOTNet_relative_y     = float(data_packet[2].astype(np.float32))
                     self.SPOTNet_relative_angle = float(data_packet[3].astype(np.float32))
                     self.SPOTNet_sees_target    = float(data_packet[4]) > self.SPOTNet_detection_threshold
+                    print("SPOTNet Packet. See target?: %s" %(self.SPOTNet_sees_target))
                     
                 else:
                     # We received a packet from the Pi
-                    print("Pi packet!")
                     # input_data_array is: [red_x, red_y, red_theta, red_vx, red_vy, red_omega, black_x, black_y, black_theta, black_vx, black_vy, black_omega]  
-                    self.Pi_time, self.Pi_red_x, self.Pi_red_y, self.Pi_red_theta, self.Pi_red_Vx, self.Pi_red_Vy, self.Pi_red_omega, self.Pi_black_x, self.Pi_black_y, self.Pi_black_theta, self.Pi_black_Vx, self.Pi_black_Vy, self.Pi_black_omega = data_packet
+                    self.Pi_time, self.Pi_red_x, self.Pi_red_y, self.Pi_red_theta, self.Pi_red_Vx, self.Pi_red_Vy, self.Pi_red_omega, self.Pi_black_x, self.Pi_black_y, self.Pi_black_theta, self.Pi_black_Vx, self.Pi_black_Vy, self.Pi_black_omega = data_packet.astype(np.float32)
+                    print("Pi Packet! Time: %.1f" %self.Pi_time)
                 
             # Write the data to the queue for DeepGuidanceModelRunner to use!
             """ This queue is thread-safe. If I append multiple times without popping, the data in the queue is overwritten. Perfect! """
@@ -143,7 +147,8 @@ class DeepGuidanceModelRunner:
         self.offset_y = 0 # Docking offset in the body frame
         self.offset_angle = 0
 
-        
+        # Uncomment this on TF2.0
+        # tf.compat.v1.disable_eager_execution()
         
         # Clear any old graph
         tf.reset_default_graph()
@@ -197,7 +202,7 @@ class DeepGuidanceModelRunner:
                 SPOTNet_relative_x, SPOTNet_relative_y, SPOTNet_relative_angle, SPOTNet_sees_target = self.messages_to_deep_guidance.pop()
             except IndexError:
                 # Queue was empty, try agian
-                print("Queue was empty!")
+                #print("Queue was empty!")
                 continue
                         
             #################################
@@ -263,10 +268,10 @@ class DeepGuidanceModelRunner:
         
         print("Model gently stopped.")
 
-        print("Saving data to file")
+        print("Saving data to file...",end='')
         with open('deep_guidance_data_' + time.strftime('%Y-%m-%d-%H_%M-%S', time.localtime()) + '.txt', 'wb') as f:
                 np.save(f, np.asarray(data_log))
-        
+        print("Done!")
         # Close tensorflow session
         self.sess.close()
 
@@ -274,7 +279,7 @@ class DeepGuidanceModelRunner:
 
 
 # Are we testing?
-testing = True
+testing = False
 
 ##################################################
 #### Start communication with JetsonRepeater #####
@@ -287,6 +292,7 @@ else:
         try: # Try to connect
             client_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             client_socket.connect("/tmp/jetsonRepeater") # Connecting...
+            client_socket.settimeout(2) # Setting the socket timeout to 2 seconds
             print("Connected to JetsonRepeater!")
             break
         except: # If connection attempt failed

@@ -85,6 +85,9 @@ agent_file       = __import__('agent' + Settings.AGENT)
 ##########################
 start_time = time.time()
 
+# Uncomment on TF2.0
+#tf.compat.v1.disable_eager_execution()
+
 # Clearing Tensorflow graph
 tf.reset_default_graph()
 

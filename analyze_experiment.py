@@ -74,7 +74,7 @@ for i in range(len(data)):
     if SPOTNet_sees_target:
         rel_vx_body = 0
         rel_vy_body = 0
-        raw_total_state_log.append([SPOTNet_relative_x, SPOTNet_relative_y, rel_vx_body, rel_vy_body, SPOTNet_relative_angle, Pi_black_omega - Pi_red_omega, Pi_red_x, Pi_red_y, Pi_red_theta, Pi_black_x, Pi_black_y, Pi_black_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_Vx, Pi_black_Vy, Pi_black_omega])
+        raw_total_state_log.append([SPOTNet_relative_x, SPOTNet_relative_y, rel_vx_body, rel_vy_body, SPOTNet_relative_angle, Pi_black_omega - Pi_red_omega, Pi_red_x, Pi_red_y, Pi_red_theta, Pi_red_x + SPOTNet_relative_x, Pi_red_y + SPOTNet_relative_y, Pi_red_theta + SPOTNet_relative_angle, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_Vx, Pi_black_Vy, Pi_black_omega])
     else:
         rel_x_body = 0
         rel_y_body = 0

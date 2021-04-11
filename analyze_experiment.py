@@ -12,6 +12,12 @@ from pyvirtualdisplay import Display # for rendering
 from settings import Settings
 environment_file = __import__('environment_' + Settings.ENVIRONMENT) # importing the environment
 
+def make_C_bI(angle):        
+    C_bI = np.array([[ np.cos(angle), np.sin(angle)],
+                     [-np.sin(angle), np.cos(angle)]]) # [2, 2]        
+    return C_bI
+
+
 # Generate a virtual display for plotting
 display = Display(visible = False, size = (1400,900))
 display.start()
@@ -74,7 +80,9 @@ for i in range(len(data)):
     if SPOTNet_sees_target:
         rel_vx_body = 0
         rel_vy_body = 0
-        raw_total_state_log.append([SPOTNet_relative_x, SPOTNet_relative_y, rel_vx_body, rel_vy_body, SPOTNet_relative_angle, Pi_black_omega - Pi_red_omega, Pi_red_x, Pi_red_y, Pi_red_theta, Pi_red_x + SPOTNet_relative_x, Pi_red_y + SPOTNet_relative_y, Pi_red_theta + SPOTNet_relative_angle, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_Vx, Pi_black_Vy, Pi_black_omega])
+        SPOTNet_relative_position_body = np.array([SPOTNet_relative_x, SPOTNet_relative_y])
+        SPOTNet_relative_position_inertial = np.matmul(make_C_bI(Pi_red_theta).T, SPOTNet_relative_position_body)
+        raw_total_state_log.append([SPOTNet_relative_x, SPOTNet_relative_y, rel_vx_body, rel_vy_body, SPOTNet_relative_angle, Pi_black_omega - Pi_red_omega, Pi_red_x, Pi_red_y, Pi_red_theta, Pi_red_x + SPOTNet_relative_position_inertial[0], Pi_red_y + SPOTNet_relative_position_inertial[1], Pi_red_theta + SPOTNet_relative_angle, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_Vx, Pi_black_Vy, Pi_black_omega])
     else:
         rel_x_body = 0
         rel_y_body = 0

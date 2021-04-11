@@ -25,7 +25,7 @@ display.start()
 #####################################
 ### Load in the experimental data ###
 #####################################
-log_filename = glob.glob('*.txt')[0]
+log_filename = glob.glob('*26-50.txt')[0]
 data = np.load(log_filename)
 print("Data file %s is loaded" %log_filename)
 os.makedirs(log_filename.split('.')[0], exist_ok=True)
@@ -68,6 +68,7 @@ environment.reset(False,False)
 print("Rendering animation...", end='')
 raw_total_state_log = []
 cumulative_reward_log = []
+SPOTNet_sees_target_log = []
 cumulative_rewards = 0
 for i in range(len(data)):
     Pi_time, deep_guidance_ax, deep_guidance_ay, deep_guidance_alpha, \
@@ -83,12 +84,14 @@ for i in range(len(data)):
         SPOTNet_relative_position_body = np.array([SPOTNet_relative_x, SPOTNet_relative_y])
         SPOTNet_relative_position_inertial = np.matmul(make_C_bI(Pi_red_theta).T, SPOTNet_relative_position_body)
         raw_total_state_log.append([SPOTNet_relative_x, SPOTNet_relative_y, rel_vx_body, rel_vy_body, SPOTNet_relative_angle, Pi_black_omega - Pi_red_omega, Pi_red_x, Pi_red_y, Pi_red_theta, Pi_red_x + SPOTNet_relative_position_inertial[0], Pi_red_y + SPOTNet_relative_position_inertial[1], Pi_red_theta + SPOTNet_relative_angle, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_Vx, Pi_black_Vy, Pi_black_omega])
+        SPOTNet_sees_target_log.append(True)
     else:
         rel_x_body = 0
         rel_y_body = 0
         rel_vx_body = 0
         rel_vy_body = 0        
         raw_total_state_log.append([rel_x_body, rel_y_body, rel_vx_body, rel_vy_body, Pi_black_theta - Pi_red_theta, Pi_black_omega - Pi_red_omega,          Pi_red_x, Pi_red_y, Pi_red_theta, Pi_black_x, Pi_black_y, Pi_black_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_Vx, Pi_black_Vy, Pi_black_omega])
+        SPOTNet_sees_target_log.append(False)
     
     
     # Check the reward function based off this state
@@ -106,7 +109,7 @@ for i in range(len(data)):
     
 
 # Render the episode
-environment_file.render(np.asarray(raw_total_state_log), 0, 0, np.asarray(cumulative_reward_log), 0, 0, 0, 0, 0, 1, log_filename.split('.')[0], '', time_log)
+environment_file.render(np.asarray(raw_total_state_log), 0, 0, np.asarray(cumulative_reward_log), 0, 0, 0, 0, 0, 1, log_filename.split('.')[0], '', time_log, np.asarray(SPOTNet_sees_target_log))
 print("Done!")
 # Close the display
 del environment

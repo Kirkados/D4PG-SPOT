@@ -106,7 +106,7 @@ class Environment:
         self.AUGMENT_STATE_WITH_ACTION_LENGTH =   0 # [timesteps] how many timesteps of previous actions should be included in the state. This helps with making good decisions among delayed dynamics.
         self.MAX_NUMBER_OF_TIMESTEPS          = 300#150 # per episode
         self.ADDITIONAL_VALUE_INFO            = False # whether or not to include additional reward and value distribution information on the animations
-        self.SKIP_FAILED_ANIMATIONS           = True # Error the program or skip when animations fail?
+        self.SKIP_FAILED_ANIMATIONS           = False # Error the program or skip when animations fail?
 
         # Physical properties
         self.LENGTH                        = 0.3  # [m] side length
@@ -739,7 +739,7 @@ def dynamics_equations_of_motion(state, t, parameters):
 ##########################################
 ##### Function to animate the motion #####
 ##########################################
-def render(states, actions, instantaneous_reward_log, cumulative_reward_log, critic_distributions, target_critic_distributions, projected_target_distribution, bins, loss_log, episode_number, filename, save_directory, time_log):
+def render(states, actions, instantaneous_reward_log, cumulative_reward_log, critic_distributions, target_critic_distributions, projected_target_distribution, bins, loss_log, episode_number, filename, save_directory, time_log, SPOTNet_sees_target_log):
     """
     TOTAL_STATE = [relative_x, relative_y, relative_vx, relative_vy, relative_angle, relative_angular_velocity, chaser_x, chaser_y, chaser_theta, target_x, target_y, target_theta, chaser_vx, chaser_vy, chaser_omega, target_vx, target_vy, target_omega] *# Relative pose expressed in the chaser's body frame; everythign else in Inertial frame #*
      """   
@@ -907,6 +907,11 @@ def render(states, actions, instantaneous_reward_log, cumulative_reward_log, cri
 
         # Draw the target body
         target_body.set_data(target_body_inertial[frame,0,:], target_body_inertial[frame,1,:])
+        
+        if SPOTNet_sees_target_log[frame]:
+            target_body.set_color('y')
+        else:
+            target_body.set_color('g')
 
         # Draw the front face of the target body in a different colour
         target_front_face.set_data(target_front_face_inertial[frame,0,:], target_front_face_inertial[frame,1,:])

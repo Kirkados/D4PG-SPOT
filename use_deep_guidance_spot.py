@@ -202,7 +202,6 @@ class DeepGuidanceModelRunner:
                 SPOTNet_relative_x, SPOTNet_relative_y, SPOTNet_relative_angle, SPOTNet_sees_target = self.messages_to_deep_guidance.pop()
             except IndexError:
                 # Queue was empty, try agian
-                #print("Queue was empty!")
                 continue
                         
             #################################
@@ -258,13 +257,14 @@ class DeepGuidanceModelRunner:
             # Incrementing the counter
             counter = counter + 1
             
-            # Log this timestep's data
-            data_log.append([Pi_time, deep_guidance[0], deep_guidance[1], deep_guidance[2], \
-                             Pi_red_x, Pi_red_y, Pi_red_theta, \
-                             Pi_red_Vx, Pi_red_Vy, Pi_red_omega,        \
-                             Pi_black_x, Pi_black_y, Pi_black_theta,    \
-                             Pi_black_Vx, Pi_black_Vy, Pi_black_omega,  \
-                             SPOTNet_relative_x, SPOTNet_relative_y, SPOTNet_relative_angle, SPOTNet_sees_target])
+            # Log this timestep's data only if the experiment has actually started
+            if Pi_time > 0:                
+                data_log.append([Pi_time, deep_guidance[0], deep_guidance[1], deep_guidance[2], \
+                                 Pi_red_x, Pi_red_y, Pi_red_theta, \
+                                 Pi_red_Vx, Pi_red_Vy, Pi_red_omega,        \
+                                 Pi_black_x, Pi_black_y, Pi_black_theta,    \
+                                 Pi_black_Vx, Pi_black_Vy, Pi_black_omega,  \
+                                 SPOTNet_relative_x, SPOTNet_relative_y, SPOTNet_relative_angle, SPOTNet_sees_target])
         
         print("Model gently stopped.")
 

@@ -208,7 +208,28 @@ class DeepGuidanceModelRunner:
             ### Building the Policy Input ###
             ################################# 
             if SPOTNet_sees_target:
-                policy_input = np.array([SPOTNet_relative_x - self.offset_x, SPOTNet_relative_y - self.offset_y, SPOTNet_relative_angle - self.offset_angle, Pi_red_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_omega])
+                """ If SPOTNet sees the target, we want to hold that target's position constant until the next update. 
+                The current version holds the SPOTNet_relative_x constant even though Pi_red_x is changing. This gives the 
+                illusion that the target is moving.
+                We instead want to fix the inertial point of the target and calculate a new Relative_x at each timestep
+                """
+                if self.previousSPOTNet_relative_x != SPOTNet_relative_x:
+                    # We got a new SPOTNet packet, update the estimated target position                    
+                    policy_input = np.array([SPOTNet_relative_x - self.offset_x, SPOTNet_relative_y - self.offset_y, SPOTNet_relative_angle - self.offset_angle, Pi_red_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_omega])
+                    self.previousSPOTNet_relative_x = SPOTNet_relative_x
+                    
+                    # Estimate the target's inertial position so we can hold it constant as the chaser moves (until we get a new better estimate!)
+                    relative_pose_body = np.array([SPOTNet_relative_x, SPOTNet_relative_y])
+                    relative_pose_inertial = np.matmul(make_C_bI(Pi_red_theta).T, relative_pose_body)
+                    self.SPOTNet_target_x_inertial = Pi_red_x + relative_pose_inertial[0] # Inertial estimate of the target
+                    self.SPOTNet_target_y_inertial = Pi_red_y + relative_pose_inertial[1] # Inertial estimate of the target
+                    self.SPOTNet_target_angle_inertial = Pi_red_theta + SPOTNet_relative_angle # Inertial estimate of the target
+                else:
+                    # We see the target but we've updated Red's position via Phasespace and need to compensate for Red's motion in our calculation of the relative position inputs
+                    # The target's inertial position should still be [self.SPOTNet_target_x_inertial, self.SPOTNet_target_y_inertial, self.SPOTNet_target_angle_inertial]
+                    relative_pose_inertial = np.array([self.SPOTNet_target_x_inertial - Pi_red_x, self.SPOTNet_target_y_inertial - Pi_red_y])
+                    relative_pose_body = np.matmul(make_C_bI(Pi_red_theta), relative_pose_inertial)
+                    policy_input = np.array([relative_pose_body[0] - self.offset_x, relative_pose_body[1] - self.offset_y, self.SPOTNet_target_angle_inertial - Pi_red_theta - self.offset_angle, Pi_red_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_omega])
             else:
                 # Calculating the relative X and Y in the chaser's body frame
                 relative_pose_inertial = np.array([Pi_black_x - Pi_red_x, Pi_black_y - Pi_red_y])

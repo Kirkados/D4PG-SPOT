@@ -146,6 +146,9 @@ class DeepGuidanceModelRunner:
         self.offset_x = 0 # Docking offset in the body frame
         self.offset_y = 0 # Docking offset in the body frame
         self.offset_angle = 0
+        
+        # Holding the previous position so we know when SPOTNet gives a new update
+        self.previousSPOTNet_relative_x = 0.0
 
         # Uncomment this on TF2.0
         # tf.compat.v1.disable_eager_execution()
@@ -208,12 +211,10 @@ class DeepGuidanceModelRunner:
             ### Building the Policy Input ###
             ################################# 
             if SPOTNet_sees_target:
-                """ If SPOTNet sees the target, we want to hold that target's position constant until the next update. 
-                The current version holds the SPOTNet_relative_x constant even though Pi_red_x is changing. This gives the 
-                illusion that the target is moving.
-                We instead want to fix the inertial point of the target and calculate a new Relative_x at each timestep
+                """ If SPOTNet sees the target, we want to hold the target's position inertially constant until the next update. 
+                    Otherwise, we will perceive the target moving inbetween SPOTNet updates as Red moves
                 """
-                if self.previousSPOTNet_relative_x != SPOTNet_relative_x:
+                if np.abs(self.previousSPOTNet_relative_x - SPOTNet_relative_x) < 0.001:
                     # We got a new SPOTNet packet, update the estimated target position                    
                     policy_input = np.array([SPOTNet_relative_x - self.offset_x, SPOTNet_relative_y - self.offset_y, SPOTNet_relative_angle - self.offset_angle, Pi_red_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_omega])
                     self.previousSPOTNet_relative_x = SPOTNet_relative_x

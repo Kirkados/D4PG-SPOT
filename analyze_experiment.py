@@ -8,6 +8,9 @@ import glob
 import os
 import matplotlib.pyplot as plt
 from pyvirtualdisplay import Display # for rendering
+
+# import code # for debugging
+#code.interact(local=locals())
  
 from settings import Settings
 environment_file = __import__('environment_' + Settings.ENVIRONMENT) # importing the environment
@@ -70,6 +73,7 @@ raw_total_state_log = []
 cumulative_reward_log = []
 SPOTNet_sees_target_log = []
 cumulative_rewards = 0
+SPOTNet_previous_relative_x = 0.0
 for i in range(len(data)):
     Pi_time, deep_guidance_ax, deep_guidance_ay, deep_guidance_alpha, \
     Pi_red_x, Pi_red_y, Pi_red_theta, \
@@ -81,9 +85,19 @@ for i in range(len(data)):
     if SPOTNet_sees_target:
         rel_vx_body = 0
         rel_vy_body = 0
-        SPOTNet_relative_position_body = np.array([SPOTNet_relative_x, SPOTNet_relative_y])
-        SPOTNet_relative_position_inertial = np.matmul(make_C_bI(Pi_red_theta).T, SPOTNet_relative_position_body)
-        raw_total_state_log.append([SPOTNet_relative_x, SPOTNet_relative_y, rel_vx_body, rel_vy_body, SPOTNet_relative_angle, Pi_black_omega - Pi_red_omega, Pi_red_x, Pi_red_y, Pi_red_theta, Pi_red_x + SPOTNet_relative_position_inertial[0], Pi_red_y + SPOTNet_relative_position_inertial[1], Pi_red_theta + SPOTNet_relative_angle, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_Vx, Pi_black_Vy, Pi_black_omega])
+        if np.abs(SPOTNet_relative_x - SPOTNet_previous_relative_x) > 0.001:
+            # Estimate the target's inertial position so we can hold it constant as the chaser moves (until we get a new better estimate!)
+            relative_pose_body = np.array([SPOTNet_relative_x, SPOTNet_relative_y])
+            relative_pose_inertial = np.matmul(make_C_bI(Pi_red_theta).T, relative_pose_body)
+            SPOTNet_target_x_inertial = Pi_red_x + relative_pose_inertial[0] # Inertial estimate of the target
+            SPOTNet_target_y_inertial = Pi_red_y + relative_pose_inertial[1] # Inertial estimate of the target
+            SPOTNet_target_angle_inertial = Pi_red_theta + SPOTNet_relative_angle # Inertial estimate of the target
+            
+            # Saving the last SPOTNet_x so I can tell when we get a new SPOTNet update
+            SPOTNet_previous_relative_x = SPOTNet_relative_x
+        
+        # Log the data, holding the target inertially fixed between SPOTNet updates        
+        raw_total_state_log.append([SPOTNet_relative_x, SPOTNet_relative_y, rel_vx_body, rel_vy_body, SPOTNet_relative_angle, Pi_black_omega - Pi_red_omega, Pi_red_x, Pi_red_y, Pi_red_theta, SPOTNet_target_x_inertial, SPOTNet_target_y_inertial, SPOTNet_target_angle_inertial, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_Vx, Pi_black_Vy, Pi_black_omega])
         SPOTNet_sees_target_log.append(True)
     else:
         rel_x_body = 0

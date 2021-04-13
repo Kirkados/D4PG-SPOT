@@ -214,7 +214,7 @@ class DeepGuidanceModelRunner:
                 """ If SPOTNet sees the target, we want to hold the target's position inertially constant until the next update. 
                     Otherwise, we will perceive the target moving inbetween SPOTNet updates as Red moves
                 """
-                if np.abs(self.previousSPOTNet_relative_x - SPOTNet_relative_x) < 0.001:
+                if np.abs(self.previousSPOTNet_relative_x - SPOTNet_relative_x) > 0.001:
                     # We got a new SPOTNet packet, update the estimated target position                    
                     policy_input = np.array([SPOTNet_relative_x - self.offset_x, SPOTNet_relative_y - self.offset_y, SPOTNet_relative_angle - self.offset_angle, Pi_red_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_omega])
                     self.previousSPOTNet_relative_x = SPOTNet_relative_x
@@ -230,9 +230,10 @@ class DeepGuidanceModelRunner:
                     # The target's inertial position should still be [self.SPOTNet_target_x_inertial, self.SPOTNet_target_y_inertial, self.SPOTNet_target_angle_inertial]
                     relative_pose_inertial = np.array([self.SPOTNet_target_x_inertial - Pi_red_x, self.SPOTNet_target_y_inertial - Pi_red_y])
                     relative_pose_body = np.matmul(make_C_bI(Pi_red_theta), relative_pose_inertial)
-                    policy_input = np.array([relative_pose_body[0] - self.offset_x, relative_pose_body[1] - self.offset_y, self.SPOTNet_target_angle_inertial - Pi_red_theta - self.offset_angle, Pi_red_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_omega])
+                    policy_input = np.array([relative_pose_body[0] - self.offset_x, relative_pose_body[1] - self.offset_y, (self.SPOTNet_target_angle_inertial - Pi_red_theta - self.offset_angle)%(2*np.pi), Pi_red_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_omega])
             else:
-                # Calculating the relative X and Y in the chaser's body frame
+                # We don't see the target -> Use PhaseSpace only
+                # Calculating the relative X and Y in the chaser's body frame using PhaseSpace
                 relative_pose_inertial = np.array([Pi_black_x - Pi_red_x, Pi_black_y - Pi_red_y])
                 relative_pose_body = np.matmul(make_C_bI(Pi_red_theta), relative_pose_inertial)
                 policy_input = np.array([relative_pose_body[0] - self.offset_x, relative_pose_body[1] - self.offset_y, (Pi_black_theta - Pi_red_theta - self.offset_angle)%(2*np.pi), Pi_red_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_omega])

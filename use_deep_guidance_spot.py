@@ -16,6 +16,9 @@ import time
 import threading
 from collections import deque
 
+# import code # for debugging
+#code.interact(local=dict(globals(), **locals())) # Ctrl+D or Ctrl+Z to continue execution
+
 from settings import Settings
 from build_neural_networks import BuildActorNetwork
 

@@ -48,6 +48,9 @@ import tensorflow as tf
 import numpy as np
 import sys
 
+# import code # for debugging
+#code.interact(local=dict(globals(), **locals())) # Ctrl+D or Ctrl+Z to continue execution
+
 # My own
 from learner import Learner
 from replay_buffer import ReplayBuffer

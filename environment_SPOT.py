@@ -52,6 +52,9 @@ import multiprocessing
 import queue
 from scipy.integrate import odeint # Numerical integrator
 
+# import code # for debugging
+#code.interact(local=dict(globals(), **locals())) # Ctrl+D or Ctrl+Z to continue execution
+
 import matplotlib
 matplotlib.use('Agg')
 

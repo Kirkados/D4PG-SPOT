@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from pyvirtualdisplay import Display # for rendering
 
 # import code # for debugging
-#code.interact(local=locals())
+#code.interact(local=dict(globals(), **locals())) # Ctrl+D or Ctrl+Z to continue execution
  
 from settings import Settings
 environment_file = __import__('environment_' + Settings.ENVIRONMENT) # importing the environment

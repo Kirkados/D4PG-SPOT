@@ -293,10 +293,14 @@ class DeepGuidanceModelRunner:
                                  SPOTNet_relative_x, SPOTNet_relative_y, SPOTNet_relative_angle, SPOTNet_sees_target])
         
         print("Model gently stopped.")
-
-        print("Saving data to file...",end='')
-        with open('deep_guidance_data_' + time.strftime('%Y-%m-%d-%H_%M-%S', time.localtime()) + '.txt', 'wb') as f:
-                np.save(f, np.asarray(data_log))
+        
+        if len(data_log) > 0: 
+            print("Saving data to file...",end='')               
+            with open('deep_guidance_data_' + time.strftime('%Y-%m-%d-%H_%M-%S', time.localtime()) + '.txt', 'wb') as f:
+                    np.save(f, np.asarray(data_log))
+        else:
+            print("Not saving a log because there is no data to write")
+                
         print("Done!")
         # Close tensorflow session
         self.sess.close()

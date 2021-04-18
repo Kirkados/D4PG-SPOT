@@ -27,6 +27,8 @@ from build_neural_networks import BuildActorNetwork
 Deep guidance output in x and y are in the chaser body frame
 """
 
+REMAKE THE STATE WITH CHASER X AND Y INCLUDED 
+
 def make_C_bI(angle):        
     C_bI = np.array([[ np.cos(angle), np.sin(angle)],
                      [-np.sin(angle), np.cos(angle)]]) # [2, 2]        

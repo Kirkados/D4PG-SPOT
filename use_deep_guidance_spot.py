@@ -30,6 +30,12 @@ Deep guidance output in x and y are in the chaser body frame
 # Do you want the chaser's absolute position to be included in the policy_input?
 CHASER_ABSOLUTE_POSITION = True
 
+# Do you want to debug with constant accelerations?
+DEBUG_CONTROLLER_WITH_CONSTANT_ACCELERATIONS = False
+constant_Ax = 0 # [m/s^2] in inertial frame
+constant_Ay = 0 # [m/s^2] in inertial frame
+constant_alpha = 0 # [rad/s^2] in inertial frame
+
 def make_C_bI(angle):        
     C_bI = np.array([[ np.cos(angle), np.sin(angle)],
                      [-np.sin(angle), np.cos(angle)]]) # [2, 2]        
@@ -287,9 +293,11 @@ class DeepGuidanceModelRunner:
             deep_guidance[:-1] = np.matmul(make_C_bI(Pi_red_theta).T,deep_guidance[:-1])
      
             # Commanding constant values in the inertial frame for testing purposes
-            #deep_guidance[0] = -0.02 # [m/s^2]
-            #deep_guidance[1] = 0.02 # [m/s^2]
-            #deep_guidance[2] = -np.pi/60 # [rad/s^2]														  
+            if DEBUG_CONTROLLER_WITH_CONSTANT_ACCELERATIONS:                
+                deep_guidance[0] = constant_Ax # [m/s^2]
+                deep_guidance[1] = constant_Ay # [m/s^2]
+                deep_guidance[2] = constant_alpha # [rad/s^2]
+													  
             #################################################################
             ### Cap output if we are exceeding the max allowable velocity ###
             #################################################################

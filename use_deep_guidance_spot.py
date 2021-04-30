@@ -195,6 +195,10 @@ class DeepGuidanceModelRunner:
         # To log data
         data_log = []
         
+        # Run zeros through the policy to get it ready for action
+        deep_guidance = self.sess.run(self.actor.action_scaled, feed_dict={self.state_placeholder:np.zeros([1, Settings.OBSERVATION_SIZE])})[0] # [accel_x, accel_y, alpha]
+            
+        
         # Run until we want to stop
         while not stop_run_flag.is_set():            
                        

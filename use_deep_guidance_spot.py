@@ -27,7 +27,8 @@ from build_neural_networks import BuildActorNetwork
 Deep guidance output in x and y are in the chaser body frame
 """
 
-REMAKE THE STATE WITH CHASER X AND Y INCLUDED 
+# Do you want the chaser's absolute position to be included in the policy_input?
+CHASER_ABSOLUTE_POSITION = True
 
 def make_C_bI(angle):        
     C_bI = np.array([[ np.cos(angle), np.sin(angle)],
@@ -195,9 +196,8 @@ class DeepGuidanceModelRunner:
         # To log data
         data_log = []
         
-        # Run zeros through the policy to get it ready for action
-        deep_guidance = self.sess.run(self.actor.action_scaled, feed_dict={self.state_placeholder:np.zeros([1, Settings.OBSERVATION_SIZE])})[0] # [accel_x, accel_y, alpha]
-            
+        # Run zeros through the policy to ensure all libraries are properly loaded in
+        deep_guidance = self.sess.run(self.actor.action_scaled, feed_dict={self.state_placeholder:np.zeros([1, Settings.OBSERVATION_SIZE])})[0]            
         
         # Run until we want to stop
         while not stop_run_flag.is_set():            
@@ -224,8 +224,16 @@ class DeepGuidanceModelRunner:
                     Otherwise, we will perceive the target moving inbetween SPOTNet updates as Red moves
                 """
                 if np.abs(self.previousSPOTNet_relative_x - SPOTNet_relative_x) > 0.001:
-                    # We got a new SPOTNet packet, update the estimated target position                    
-                    policy_input = np.array([SPOTNet_relative_x - self.offset_x, SPOTNet_relative_y - self.offset_y, SPOTNet_relative_angle - self.offset_angle, Pi_red_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_omega])
+                    # We got a new SPOTNet packet, build the policy_input then update the estimated target position                    
+                                        
+                    if CHASER_ABSOLUTE_POSITION:
+                        # Without chaser absolute position
+                        policy_input = np.array([SPOTNet_relative_x - self.offset_x, SPOTNet_relative_y - self.offset_y, SPOTNet_relative_angle - self.offset_angle, Pi_red_x, Pi_red_y, Pi_red_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_omega])
+                    else:
+                        # With chaser absolute position
+                        policy_input = np.array([SPOTNet_relative_x - self.offset_x, SPOTNet_relative_y - self.offset_y, SPOTNet_relative_angle - self.offset_angle, Pi_red_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_omega])
+                    
+                    
                     self.previousSPOTNet_relative_x = SPOTNet_relative_x
                     
                     # Estimate the target's inertial position so we can hold it constant as the chaser moves (until we get a new better estimate!)
@@ -239,13 +247,29 @@ class DeepGuidanceModelRunner:
                     # The target's inertial position should still be [self.SPOTNet_target_x_inertial, self.SPOTNet_target_y_inertial, self.SPOTNet_target_angle_inertial]
                     relative_pose_inertial = np.array([self.SPOTNet_target_x_inertial - Pi_red_x, self.SPOTNet_target_y_inertial - Pi_red_y])
                     relative_pose_body = np.matmul(make_C_bI(Pi_red_theta), relative_pose_inertial)
-                    policy_input = np.array([relative_pose_body[0] - self.offset_x, relative_pose_body[1] - self.offset_y, (self.SPOTNet_target_angle_inertial - Pi_red_theta - self.offset_angle)%(2*np.pi), Pi_red_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_omega])
+                                        
+                    if CHASER_ABSOLUTE_POSITION:
+                        # With chaser absolute position
+                        policy_input = np.array([relative_pose_body[0] - self.offset_x, relative_pose_body[1] - self.offset_y, (self.SPOTNet_target_angle_inertial - Pi_red_theta - self.offset_angle)%(2*np.pi), Pi_red_x, Pi_red_y, Pi_red_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_omega])
+                    else:
+                        # Without chaser absolute position
+                        policy_input = np.array([relative_pose_body[0] - self.offset_x, relative_pose_body[1] - self.offset_y, (self.SPOTNet_target_angle_inertial - Pi_red_theta - self.offset_angle)%(2*np.pi), Pi_red_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_omega])
+                    
+                    
             else:
                 # We don't see the target -> Use PhaseSpace only
                 # Calculating the relative X and Y in the chaser's body frame using PhaseSpace
                 relative_pose_inertial = np.array([Pi_black_x - Pi_red_x, Pi_black_y - Pi_red_y])
                 relative_pose_body = np.matmul(make_C_bI(Pi_red_theta), relative_pose_inertial)
-                policy_input = np.array([relative_pose_body[0] - self.offset_x, relative_pose_body[1] - self.offset_y, (Pi_black_theta - Pi_red_theta - self.offset_angle)%(2*np.pi), Pi_red_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_omega])
+                                
+                if CHASER_ABSOLUTE_POSITION:
+                    # With chaser absolute position
+                    policy_input = np.array([relative_pose_body[0] - self.offset_x, relative_pose_body[1] - self.offset_y, (Pi_black_theta - Pi_red_theta - self.offset_angle)%(2*np.pi), Pi_red_x, Pi_red_y, Pi_red_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_omega])
+                else:                    
+                    # Without chaser absolute position
+                    policy_input = np.array([relative_pose_body[0] - self.offset_x, relative_pose_body[1] - self.offset_y, (Pi_black_theta - Pi_red_theta - self.offset_angle)%(2*np.pi), Pi_red_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_omega])
+                
+                
     
             # Normalizing            
             if Settings.NORMALIZE_STATE:

@@ -81,7 +81,7 @@ class Environment:
         #self.IRRELEVANT_STATES                = [2,3,5,9,10,11] # [chaser_x, chaser_y, chaser_theta, relative_x, relative_y, relative_angle, chaser_vx, chaser_vy, chaser_omega, target_vx, target_vy, target_omega]
         #self.IRRELEVANT_STATES                = [2,3,5,6,7,9,10,11] # [chaser_theta, relative_x, relative_y, relative_angle, chaser_vx, chaser_vy, chaser_omega, target_vx, target_vy, target_omega] # omitting chaser_x, chaser_y
         #self.IRRELEVANT_STATES                = [2,3,5,6,7,9,10,11,15,16] # [relative_x, relative_y, relative_angle, chaser_theta, chaser_vx, chaser_vy, chaser_omega, target_omega]; # omitting chaser_x, chaser_y, target_vx, target_vy
-		self.IRRELEVANT_STATES                = [2,3,5,9,10,11,15,16] # [relative_x, relative_y, relative_angle, chaser_x, chaser_y, chaser_theta, chaser_vx, chaser_vy, chaser_omega, target_omega] # omitting relative_vx, relative_vy, relative_omega, target_x, target_y, target_theta, target_vx, target_vy
+        self.IRRELEVANT_STATES                = [2,3,5,9,10,11,15,16] # [relative_x, relative_y, relative_angle, chaser_x, chaser_y, chaser_theta, chaser_vx, chaser_vy, chaser_omega, target_omega] # omitting relative_vx, relative_vy, relative_omega, target_x, target_y, target_theta, target_vx, target_vy
         self.OBSERVATION_SIZE                 = self.TOTAL_STATE_SIZE - len(self.IRRELEVANT_STATES) # the size of the observation input to the policy
         self.ACTION_SIZE                      = 3 # [x_dot_dot, y_dot_dot, theta_dot_dot] in the BODY frame
         self.MAX_VELOCITY                     = 0.2 # [m/s]
@@ -108,7 +108,7 @@ class Environment:
         self.TIMESTEP                         =   0.2 # [s]
         self.DYNAMICS_DELAY                   =   0 # [timesteps of delay] how many timesteps between when an action is commanded and when it is realized
         self.AUGMENT_STATE_WITH_ACTION_LENGTH =   0 # [timesteps] how many timesteps of previous actions should be included in the state. This helps with making good decisions among delayed dynamics.
-        self.MAX_NUMBER_OF_TIMESTEPS          = 300#150 # per episode
+        self.MAX_NUMBER_OF_TIMESTEPS          = 1000#300#150 # per episode
         self.ADDITIONAL_VALUE_INFO            = False # whether or not to include additional reward and value distribution information on the animations
         self.SKIP_FAILED_ANIMATIONS           = False # Error the program or skip when animations fail?
 

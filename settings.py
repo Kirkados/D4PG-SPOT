@@ -15,7 +15,7 @@ class Settings:
     ##### Run Settings #####
     ########################
 
-    RUN_NAME               = 'strict_table_spin_chaser_xy_included'#'velocity_penalty50_gamma95_4piend_random_uniform'
+    RUN_NAME               = 'more_time_strict_table_spin_chaser_xy_included'#'velocity_penalty50_gamma95_4piend_random_uniform'
     RESUME_TRAINING        = False # If True, main.py must be run from a previous run's 'code' folder.
     ENVIRONMENT            = 'SPOT'
     #ENVIRONMENT            = 'ICs'

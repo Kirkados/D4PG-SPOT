@@ -30,6 +30,12 @@ Deep guidance output in x and y are in the chaser body frame
 # Do you want the chaser's absolute position to be included in the policy_input?
 CHASER_ABSOLUTE_POSITION = True
 
+CAMERA_PROCESSING_TIME = 0.7 # [s] how long it takes SPOTNet to process an image
+PHASESPACE_TIMESTEP = 0.5 # [s] equal to serverRate
+
+# Are we testing?
+testing = False
+
 # Do you want to debug with constant accelerations?
 DEBUG_CONTROLLER_WITH_CONSTANT_ACCELERATIONS = False
 constant_Ax = 0 # [m/s^2] in inertial frame
@@ -159,8 +165,24 @@ class DeepGuidanceModelRunner:
         self.offset_y = 0 # Docking offset in the body frame
         self.offset_angle = 0
         
+        # So we can access old Pi positions while we wait for new SPOTNet images to come in
+        self.pi_position_queue = deque(maxlen = round(CAMERA_PROCESSING_TIME/PHASESPACE_TIMESTEP))
+        
+        # Loading the queue up with zeros
+        for i in range(round(CAMERA_PROCESSING_TIME/PHASESPACE_TIMESTEP)):
+            self.pi_position_queue.append((0.,0.,0.))
+        
         # Holding the previous position so we know when SPOTNet gives a new update
         self.previousSPOTNet_relative_x = 0.0
+        
+        """ Holding the chaser's x, y, and theta position when a SPOTNet image was taken
+            which we assume is at the same moment the previous results are received.
+            This is to ensure the ~0.7 s SPOTNet processing time isn't poorly reflected
+            in the target's estimated inertial position
+        """
+        self.chaser_x_when_image_was_taken     = 0
+        self.chaser_y_when_image_was_taken     = 0
+        self.chaser_theta_when_image_was_taken = 0
 
         # Uncomment this on TF2.0
         # tf.compat.v1.disable_eager_execution()
@@ -230,36 +252,38 @@ class DeepGuidanceModelRunner:
                     Otherwise, we will perceive the target moving inbetween SPOTNet updates as Red moves
                 """
                 if np.abs(self.previousSPOTNet_relative_x - SPOTNet_relative_x) > 0.001:
-                    # We got a new SPOTNet packet, build the policy_input then update the estimated target position                    
-                                        
-                    if CHASER_ABSOLUTE_POSITION:
-                        # Without chaser absolute position
-                        policy_input = np.array([SPOTNet_relative_x - self.offset_x, SPOTNet_relative_y - self.offset_y, SPOTNet_relative_angle - self.offset_angle, Pi_red_x, Pi_red_y, Pi_red_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_omega])
-                    else:
-                        # With chaser absolute position
-                        policy_input = np.array([SPOTNet_relative_x - self.offset_x, SPOTNet_relative_y - self.offset_y, SPOTNet_relative_angle - self.offset_angle, Pi_red_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_omega])
-                    
-                    
-                    self.previousSPOTNet_relative_x = SPOTNet_relative_x
-                    
+                    # We got a new SPOTNet packet, update the estimated target inertial position                    
+       
                     # Estimate the target's inertial position so we can hold it constant as the chaser moves (until we get a new better estimate!)
                     relative_pose_body = np.array([SPOTNet_relative_x, SPOTNet_relative_y])
-                    relative_pose_inertial = np.matmul(make_C_bI(Pi_red_theta).T, relative_pose_body)
-                    self.SPOTNet_target_x_inertial = Pi_red_x + relative_pose_inertial[0] # Inertial estimate of the target
-                    self.SPOTNet_target_y_inertial = Pi_red_y + relative_pose_inertial[1] # Inertial estimate of the target
-                    self.SPOTNet_target_angle_inertial = Pi_red_theta + SPOTNet_relative_angle # Inertial estimate of the target
-                else:
-                    # We see the target but we've updated Red's position via Phasespace and need to compensate for Red's motion in our calculation of the relative position inputs
-                    # The target's inertial position should still be [self.SPOTNet_target_x_inertial, self.SPOTNet_target_y_inertial, self.SPOTNet_target_angle_inertial]
-                    relative_pose_inertial = np.array([self.SPOTNet_target_x_inertial - Pi_red_x, self.SPOTNet_target_y_inertial - Pi_red_y])
-                    relative_pose_body = np.matmul(make_C_bI(Pi_red_theta), relative_pose_inertial)
+                    relative_pose_inertial = np.matmul(make_C_bI(self.chaser_theta_when_image_was_taken).T, relative_pose_body)
+                    self.SPOTNet_target_x_inertial = self.chaser_x_when_image_was_taken + relative_pose_inertial[0] # Inertial estimate of the target
+                    self.SPOTNet_target_y_inertial = self.chaser_y_when_image_was_taken + relative_pose_inertial[1] # Inertial estimate of the target
+                    self.SPOTNet_target_angle_inertial = self.chaser_theta_when_image_was_taken + SPOTNet_relative_angle # Inertial estimate of the target
+                    
+                    # Assuming a new image was just taken, hold the chaser position at this moment for use when we get the spotnet results
+                    self.chaser_x_when_image_was_taken = Pi_red_x
+                    self.chaser_y_when_image_was_taken = Pi_red_y
+                    self.chaser_theta_when_image_was_taken = Pi_red_theta
+                    
+                    # Logging so we know when we receive a new spotnet packet
+                    self.previousSPOTNet_relative_x = SPOTNet_relative_x
+                
+                """ Now, calculate the relative position of the target using the inertial estimate of where the target is, along with the current 
+                    Phasespace measurement of Red's current position.
+                    
+                    # The target's inertial position, as estimated by spotnet is
+                    [self.SPOTNet_target_x_inertial, self.SPOTNet_target_y_inertial, self.SPOTNet_target_angle_inertial]
+                """
+                relative_pose_inertial = np.array([self.SPOTNet_target_x_inertial - Pi_red_x, self.SPOTNet_target_y_inertial - Pi_red_y])
+                relative_pose_body = np.matmul(make_C_bI(Pi_red_theta), relative_pose_inertial)
                                         
-                    if CHASER_ABSOLUTE_POSITION:
-                        # With chaser absolute position
-                        policy_input = np.array([relative_pose_body[0] - self.offset_x, relative_pose_body[1] - self.offset_y, (self.SPOTNet_target_angle_inertial - Pi_red_theta - self.offset_angle)%(2*np.pi), Pi_red_x, Pi_red_y, Pi_red_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_omega])
-                    else:
-                        # Without chaser absolute position
-                        policy_input = np.array([relative_pose_body[0] - self.offset_x, relative_pose_body[1] - self.offset_y, (self.SPOTNet_target_angle_inertial - Pi_red_theta - self.offset_angle)%(2*np.pi), Pi_red_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_omega])
+                if CHASER_ABSOLUTE_POSITION:
+                    # With chaser absolute position
+                    policy_input = np.array([relative_pose_body[0] - self.offset_x, relative_pose_body[1] - self.offset_y, (self.SPOTNet_target_angle_inertial - Pi_red_theta - self.offset_angle)%(2*np.pi), Pi_red_x, Pi_red_y, Pi_red_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_omega])
+                else:
+                    # Without chaser absolute position
+                    policy_input = np.array([relative_pose_body[0] - self.offset_x, relative_pose_body[1] - self.offset_y, (self.SPOTNet_target_angle_inertial - Pi_red_theta - self.offset_angle)%(2*np.pi), Pi_red_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_omega])
                     
                     
             else:
@@ -275,6 +299,11 @@ class DeepGuidanceModelRunner:
                     # Without chaser absolute position
                     policy_input = np.array([relative_pose_body[0] - self.offset_x, relative_pose_body[1] - self.offset_y, (Pi_black_theta - Pi_red_theta - self.offset_angle)%(2*np.pi), Pi_red_theta, Pi_red_Vx, Pi_red_Vy, Pi_red_omega, Pi_black_omega])
                 
+                """ Since SPOTNet doesn't see the target, we need to estimate the chaser_x_when_image_was_taken values
+                    I'll estimate that the camera delay in samples is: round(CAMERA_PROCESSING_TIME/PHASESPACE_TIMESTEP)
+                """
+                self.chaser_x_when_image_was_taken, self.chaser_y_when_image_was_taken, self.chaser_theta_when_image_was_taken = self.pi_position_queue.pop()
+                self.pi_position_queue.append((Pi_red_x, Pi_red_y, Pi_red_theta))
                 
     
             # Normalizing            
@@ -328,7 +357,8 @@ class DeepGuidanceModelRunner:
                                  Pi_red_Vx, Pi_red_Vy, Pi_red_omega,        \
                                  Pi_black_x, Pi_black_y, Pi_black_theta,    \
                                  Pi_black_Vx, Pi_black_Vy, Pi_black_omega,  \
-                                 SPOTNet_relative_x, SPOTNet_relative_y, SPOTNet_relative_angle, SPOTNet_sees_target])
+                                 SPOTNet_relative_x, SPOTNet_relative_y, SPOTNet_relative_angle, SPOTNet_sees_target,
+                                 self.SPOTNet_target_x_inertial, self.SPOTNet_target_y_inertial, self.SPOTNet_target_angle_inertial])
         
         print("Model gently stopped.")
         
@@ -343,11 +373,6 @@ class DeepGuidanceModelRunner:
         # Close tensorflow session
         self.sess.close()
 
-
-
-
-# Are we testing?
-testing = False
 
 ##################################################
 #### Start communication with JetsonRepeater #####

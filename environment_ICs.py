@@ -102,7 +102,8 @@ class Environment:
             Pi_red_Vx, Pi_red_Vy, Pi_red_omega,        \
             Pi_black_x, Pi_black_y, Pi_black_theta,    \
             Pi_black_Vx, Pi_black_Vy, Pi_black_omega,  \
-            SPOTNet_relative_x, SPOTNet_relative_y, SPOTNet_relative_angle, SPOTNet_sees_target = data[0,:]
+            SPOTNet_relative_x, SPOTNet_relative_y, SPOTNet_relative_angle, SPOTNet_sees_target, \
+            SPOTNet_target_x_inertial, SPOTNet_target_y_inertial, SPOTNet_target_angle_inertial= data[0,:]
         
         
         self.INITIAL_CHASER_POSITION          = np.array([Pi_red_x, Pi_red_y, Pi_red_theta]) # [m, m, rad]

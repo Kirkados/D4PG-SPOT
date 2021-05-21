@@ -137,8 +137,12 @@ class MessageParser:
                 else:
                     # We received a packet from the Pi
                     # input_data_array is: [red_x, red_y, red_theta, red_vx, red_vy, red_omega, black_x, black_y, black_theta, black_vx, black_vy, black_omega]  
-                    self.Pi_time, self.Pi_red_x, self.Pi_red_y, self.Pi_red_theta, self.Pi_red_Vx, self.Pi_red_Vy, self.Pi_red_omega, self.Pi_black_x, self.Pi_black_y, self.Pi_black_theta, self.Pi_black_Vx, self.Pi_black_Vy, self.Pi_black_omega = data_packet.astype(np.float32)
-                    print("Pi Packet! Time: %.1f" %self.Pi_time)
+                    try:                        
+                        self.Pi_time, self.Pi_red_x, self.Pi_red_y, self.Pi_red_theta, self.Pi_red_Vx, self.Pi_red_Vy, self.Pi_red_omega, self.Pi_black_x, self.Pi_black_y, self.Pi_black_theta, self.Pi_black_Vx, self.Pi_black_Vy, self.Pi_black_omega = data_packet.astype(np.float32)
+                        print("Pi Packet! Time: %.1f" %self.Pi_time)
+                    except:
+                        print("Bad packet from JetsonRepeater... skipping")
+                        continue
                 
             # Write the data to the queue for DeepGuidanceModelRunner to use!
             """ This queue is thread-safe. If I append multiple times without popping, the data in the queue is overwritten. Perfect! """
@@ -183,6 +187,10 @@ class DeepGuidanceModelRunner:
         self.chaser_x_when_image_was_taken     = 0
         self.chaser_y_when_image_was_taken     = 0
         self.chaser_theta_when_image_was_taken = 0
+        
+        self.SPOTNet_target_x_inertial = 0
+        self.SPOTNet_target_y_inertial = 0
+        self.SPOTNet_target_angle_inertial = 0
 
         # Uncomment this on TF2.0
         # tf.compat.v1.disable_eager_execution()

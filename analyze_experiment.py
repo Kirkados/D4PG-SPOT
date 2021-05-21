@@ -21,6 +21,11 @@ def make_C_bI(angle):
     return C_bI
 
 
+# Check if we're using the right environment
+if Settings.ENVIRONMENT != 'SPOT':
+    print("You must use the SPOT environment in Settings... quitting")
+    raise SystemExit
+
 # Generate a virtual display for plotting
 display = Display(visible = False, size = (1400,900))
 display.start()

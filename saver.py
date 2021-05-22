@@ -41,7 +41,7 @@ class Saver:
                 return True
 
             except (ValueError, AttributeError):
-                print("No model found... :(")
+                print("Model: ", ckpt.model_checkpoint_path, " not found... :(")
                 return False
         else:
             return False

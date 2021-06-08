@@ -84,8 +84,8 @@ class Environment:
         self.IRRELEVANT_STATES                = [2,3,5,9,10,11,15,16] # [relative_x, relative_y, relative_angle, chaser_x, chaser_y, chaser_theta, chaser_vx, chaser_vy, chaser_omega, target_omega] # omitting relative_vx, relative_vy, relative_omega, target_x, target_y, target_theta, target_vx, target_vy
         self.OBSERVATION_SIZE                 = self.TOTAL_STATE_SIZE - len(self.IRRELEVANT_STATES) # the size of the observation input to the policy
         self.ACTION_SIZE                      = 3 # [x_dot_dot, y_dot_dot, theta_dot_dot] in the BODY frame
-        self.MAX_VELOCITY                     = 0.2 # [m/s]
-        self.MAX_ANGULAR_VELOCITY             = 30*np.pi/180 # [rad/s]
+        self.MAX_VELOCITY                     = 0.3 # [m/s]
+        self.MAX_ANGULAR_VELOCITY             = 45*np.pi/180 # [rad/s]
         self.LOWER_ACTION_BOUND               = np.array([-0.015, -0.015, -0.04]) # [m/s^2, m/s^2, rad/s^2] Max capabilities [-0.02, -0.02, -0.18]
         self.UPPER_ACTION_BOUND               = np.array([ 0.015,  0.015,  0.04]) # [m/s^2, m/s^2, rad/s^2] Max capabilities [ 0.02,  0.02,  0.18]
         self.LOWER_STATE_BOUND                = np.array([-3., -3., -self.MAX_VELOCITY, -self.MAX_VELOCITY, -2*np.pi, -2*self.MAX_ANGULAR_VELOCITY, 0. , 0. , -6*np.pi, 0. , 0. , -6*np.pi, -self.MAX_VELOCITY, -self.MAX_VELOCITY, -self.MAX_ANGULAR_VELOCITY, -self.MAX_VELOCITY, -self.MAX_VELOCITY, -self.MAX_ANGULAR_VELOCITY]) # [m, m, m/s, m/s, rad, rad/s, m, m, rad, m, m, rad, m/s, m/s, rad/s, m/s, m/s, rad/s] // lower bound for each element of TOTAL_STATE

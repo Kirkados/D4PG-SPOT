@@ -110,7 +110,7 @@ class Environment:
         self.AUGMENT_STATE_WITH_ACTION_LENGTH =   0 # [timesteps] how many timesteps of previous actions should be included in the state. This helps with making good decisions among delayed dynamics.
         self.MAX_NUMBER_OF_TIMESTEPS          = 300#150 # per episode
         self.ADDITIONAL_VALUE_INFO            = False # whether or not to include additional reward and value distribution information on the animations
-        self.SKIP_FAILED_ANIMATIONS           = False # Error the program or skip when animations fail?
+        self.SKIP_FAILED_ANIMATIONS           = True # Error the program or skip when animations fail?
 
         # Physical properties
         self.LENGTH                        = 0.3  # [m] side length
